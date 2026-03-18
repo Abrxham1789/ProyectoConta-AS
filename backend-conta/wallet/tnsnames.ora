@@ -1,0 +1,12 @@
+siscontable_high = (description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.us-ashburn-1.oraclecloud.com))(connect_data=(service_name=g67a8dfaf8d0c9f_siscontable_high.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))
+
+siscontable_medium = (description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.us-ashburn-1.oraclecloud.com))(connect_data=(service_name=g67a8dfaf8d0c9f_siscontable_medium.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))
+
+siscontable_low = (description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.us-ashburn-1.oraclecloud.com))(connect_data=(service_name=g67a8dfaf8d0c9f_siscontable_low.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))
+
+siscontable_tp = (description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.us-ashburn-1.oraclecloud.com))(connect_data=(service_name=g67a8dfaf8d0c9f_siscontable_tp.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))
+
+siscontable_tpurgent = (description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.us-ashburn-1.oraclecloud.com))(connect_data=(service_name=g67a8dfaf8d0c9f_siscontable_tpurgent.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))
+
+
+
