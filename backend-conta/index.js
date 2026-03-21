@@ -1,7 +1,14 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
-const { getConnection } = require('./database');
+
+console.log("--- CHEQUEO DE VARIABLES ---");
+console.log("Variable PORT:", process.env.PORT);
+console.log("Variable USER:", process.env.DB_USER);
+console.log("Ruta Oracle:", process.env.ORACLE_LIB_DIR);
+console.log("----------------------------");
+
+const { getConnection, initialize } = require('./database');
 
 // importar rutas
 const cuentasRoutes = require('./routes/catalogo_cuentas');
@@ -34,20 +41,40 @@ app.get('/', (req, res) => {
   res.send('Servidor de Contabilidad funcionando');
 });
 
-// prueba de conexión a Oracle
+// Prueba de conexión a Oracle
 app.get('/test-db', async (req, res) => {
   let connection;
   try {
     connection = await getConnection();
     const result = await connection.execute('SELECT SYSDATE FROM DUAL');
-    res.json({ message: "Conectado a Oracle Cloud", fecha: result.rows[0] });
+    res.json({ message: "Conectado a Oracle Cloud (vía Pool)", fecha: result.rows[0] });
   } catch (err) {
+    console.error("Error en /test-db:", err);
     res.status(500).json({ error: err.message });
   } finally {
-    if (connection) await connection.close();
+    if (connection) {
+      try {
+        await connection.close(); // Siempre cerrar para devolver la conexión al pool
+      } catch (closeErr) {
+        console.error("Error al cerrar conexión:", closeErr);
+      }
+    }
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
-});
+// NUEVA FORMA DE ARRANCAR: 
+// Primero inicializamos el Pool, luego levantamos el servidor.
+async function startServer() {
+  try {
+    await initialize(); // Llama a la función de database.js
+    
+    app.listen(PORT, () => {
+      console.log(`Servidor corriendo en http://localhost:${PORT}`);
+    });
+  } catch (err) {
+    console.error("No se pudo iniciar el servidor debido a un error en el Pool:", err);
+    process.exit(1); // Detiene todo si no hay base de datos
+  }
+}
+
+startServer();
