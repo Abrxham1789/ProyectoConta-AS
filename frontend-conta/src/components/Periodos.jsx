@@ -1,3 +1,4 @@
+import { useAuth } from '../context/AuthContext';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import periodosService from '../services/periodosService';
@@ -5,6 +6,7 @@ import Toast from './Toast';
 
 function Periodos() {
     const navigate = useNavigate();
+    const { usuario } = useAuth();
     const [periodos, setPeriodos] = useState([]);
     const [mensaje, setMensaje] = useState({ texto: '', tipo: '' });
     const [form, setForm] = useState({ ANIO: '', MES: '', ESTADO_CIERRE: 'ABIERTO', FECHA_CIERRE: '' });
@@ -31,7 +33,7 @@ function Periodos() {
 
     const handleCrear = async () => {
         try {
-            await periodosService.create(form);
+            await periodosService.create(form, usuario.USER_ID);
             mostrarMensaje('Periodo creado correctamente', 'exito');
             cargarPeriodos();
         } catch (err) { mostrarMensaje('Error al crear periodo', 'error'); }
@@ -41,7 +43,7 @@ function Periodos() {
 
     const handleEliminar = async () => {
         try {
-            await periodosService.delete(modalEliminar.anio, modalEliminar.mes);
+            await periodosService.delete(modalEliminar.anio, modalEliminar.mes, usuario.USER_ID);
             setModalEliminar({ visible: false, anio: null, mes: null });
             mostrarMensaje('Periodo eliminado correctamente', 'exito');
             cargarPeriodos();
@@ -55,7 +57,7 @@ function Periodos() {
 
     const handleActualizar = async () => {
         try {
-            await periodosService.update(formEditar.ANIO, formEditar.MES, formEditar);
+            await periodosService.update(formEditar.ANIO, formEditar.MES, formEditar, usuario.USER_ID);
             setModalVisible(false);
             mostrarMensaje('Periodo actualizado correctamente', 'exito');
             cargarPeriodos();

@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
+import Polizas from './components/Polizas';
 import Login from './components/Login';
 import RutaProtegida from './components/RutaProtegida';
 import CatalogoCuentas from './components/CatalogoCuentas';
@@ -13,6 +14,7 @@ import LogsAuditoria from './components/LogsAuditoria';
 
 const modulos = [
     { label: 'Catálogo de Cuentas', path: '/cuentas', icon: '📒' },
+    { label: 'Pólizas Contables', path: '/polizas', icon: '📒' },
     { label: 'Periodos de Cierre', path: '/periodos', icon: '📅' },
     { label: 'Pólizas Cabecera', path: '/polizas-cabecera', icon: '📋' },
     { label: 'Pólizas Detalle', path: '/polizas-detalle', icon: '📝' },
@@ -86,6 +88,7 @@ function App() {
         <BrowserRouter>
             <Routes>
                 <Route path="/login" element={<Login />} />
+                <Route path="/polizas" element={<RutaProtegida><Polizas /></RutaProtegida>} />
                 <Route path="/" element={<RutaProtegida><Home /></RutaProtegida>} />
                 <Route path="/cuentas" element={<RutaProtegida><CatalogoCuentas /></RutaProtegida>} />
                 <Route path="/periodos" element={<RutaProtegida><Periodos /></RutaProtegida>} />

@@ -1,3 +1,4 @@
+import { useAuth } from '../context/AuthContext';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import usuariosService from '../services/usuariosService';
@@ -5,6 +6,7 @@ import Toast from './Toast';
 
 function UsuariosContables() {
     const navigate = useNavigate();
+    const { usuario } = useAuth();
     const [usuarios, setUsuarios] = useState([]);
     const [mensaje, setMensaje] = useState({ texto: '', tipo: '' });
     const [form, setForm] = useState({ USER_ID: '', USERNAME: '', PASSWORD_HASH: '', ROL: '' });
@@ -31,7 +33,7 @@ function UsuariosContables() {
 
     const handleCrear = async () => {
         try {
-            await usuariosService.create(form);
+            await usuariosService.create(form, usuario.USER_ID);
             mostrarMensaje('Usuario creado correctamente', 'exito');
             cargarUsuarios();
         } catch (err) { mostrarMensaje('Error al crear usuario', 'error'); }
@@ -41,7 +43,7 @@ function UsuariosContables() {
 
     const handleEliminar = async () => {
         try {
-            await usuariosService.delete(modalEliminar.id);
+            await usuariosService.delete(modalEliminar.id, usuario.USER_ID);
             setModalEliminar({ visible: false, id: null });
             mostrarMensaje('Usuario eliminado correctamente', 'exito');
             cargarUsuarios();
@@ -55,7 +57,7 @@ function UsuariosContables() {
 
     const handleActualizar = async () => {
         try {
-            await usuariosService.update(formEditar.USER_ID, formEditar);
+            await usuariosService.update(formEditar.USER_ID, formEditar, usuario.USER_ID);
             setModalVisible(false);
             mostrarMensaje('Usuario actualizado correctamente', 'exito');
             cargarUsuarios();

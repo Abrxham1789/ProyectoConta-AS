@@ -1,3 +1,4 @@
+import { useAuth } from '../context/AuthContext';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import polizasDetalleService from '../services/polizasDetalleService';
@@ -5,6 +6,7 @@ import Toast from './Toast';
 
 function PolizasDetalle() {
     const navigate = useNavigate();
+    const { usuario } = useAuth();
     const [detalles, setDetalles] = useState([]);
     const [mensaje, setMensaje] = useState({ texto: '', tipo: '' });
     const [form, setForm] = useState({ POLIZA_ID: '', CUENTA_ID: '', DEBE: '', HABER: '' });
@@ -31,7 +33,7 @@ function PolizasDetalle() {
 
     const handleCrear = async () => {
         try {
-            await polizasDetalleService.create(form);
+            await polizasDetalleService.create(form, usuario.USER_ID);
             mostrarMensaje('Detalle creado correctamente', 'exito');
             cargarDetalles();
         } catch (err) { mostrarMensaje('Error al crear detalle', 'error'); }
@@ -41,7 +43,7 @@ function PolizasDetalle() {
 
     const handleEliminar = async () => {
         try {
-            await polizasDetalleService.delete(modalEliminar.id);
+            await polizasDetalleService.delete(modalEliminar.id, usuario.USER_ID);
             setModalEliminar({ visible: false, id: null });
             mostrarMensaje('Detalle eliminado correctamente', 'exito');
             cargarDetalles();
@@ -55,7 +57,7 @@ function PolizasDetalle() {
 
     const handleActualizar = async () => {
         try {
-            await polizasDetalleService.update(formEditar.DETALLE_ID, formEditar);
+            await polizasDetalleService.update(formEditar.DETALLE_ID, formEditar, usuario.USER_ID);
             setModalVisible(false);
             mostrarMensaje('Detalle actualizado correctamente', 'exito');
             cargarDetalles();

@@ -1,3 +1,4 @@
+import { useAuth } from '../context/AuthContext';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import configuracionReportesService from '../services/configuracionReportesService';
@@ -5,6 +6,7 @@ import Toast from './Toast';
 
 function ConfiguracionReportes() {
     const navigate = useNavigate();
+    const { usuario } = useAuth();
     const [configs, setConfigs] = useState([]);
     const [mensaje, setMensaje] = useState({ texto: '', tipo: '' });
     const [form, setForm] = useState({ CONFIG_ID: '', NOMBRE_REPORTE: '', SECCION: '', CUENTA_ID: '', ORDEN: '', OPERACION: '' });
@@ -31,7 +33,7 @@ function ConfiguracionReportes() {
 
     const handleCrear = async () => {
         try {
-            await configuracionReportesService.create(form);
+            await configuracionReportesService.create(form, usuario.USER_ID);
             mostrarMensaje('Configuración creada correctamente', 'exito');
             cargarConfigs();
         } catch (err) { mostrarMensaje('Error al crear configuración', 'error'); }
@@ -41,7 +43,7 @@ function ConfiguracionReportes() {
 
     const handleEliminar = async () => {
         try {
-            await configuracionReportesService.delete(modalEliminar.id);
+            await configuracionReportesService.delete(modalEliminar.id, usuario.USER_ID);
             setModalEliminar({ visible: false, id: null });
             mostrarMensaje('Configuración eliminada correctamente', 'exito');
             cargarConfigs();
@@ -55,7 +57,7 @@ function ConfiguracionReportes() {
 
     const handleActualizar = async () => {
         try {
-            await configuracionReportesService.update(formEditar.CONFIG_ID, formEditar);
+            await configuracionReportesService.update(formEditar.CONFIG_ID, formEditar, usuario.USER_ID);
             setModalVisible(false);
             mostrarMensaje('Configuración actualizada correctamente', 'exito');
             cargarConfigs();

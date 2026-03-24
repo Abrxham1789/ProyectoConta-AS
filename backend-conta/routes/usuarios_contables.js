@@ -13,8 +13,20 @@ router.post('/usuarios', async (req, res) => {
 
         await connection.execute(
             `INSERT INTO USUARIOS_CONTABLES (USER_ID, USERNAME, PASSWORD_HASH, ROL)
-             VALUES (:USER_ID, :USERNAME, :PASSWORD_HASH, :ROL)`,
+            VALUES (:USER_ID, :USERNAME, :PASSWORD_HASH, :ROL)`,
             { USER_ID, USERNAME, PASSWORD_HASH, ROL },
+            { autoCommit: true }
+        );
+
+        await connection.execute(
+            `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
+            VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
+            {
+            USER_ID: req.body.LOGGED_USER_ID || null,
+            ACCION: 'INSERT',
+            TABLA_AFECTADA: 'USUARIOS_CONTABLES',
+            REGISTRO_ID: req.body.USER_ID || null
+            },
             { autoCommit: true }
         );
 
@@ -83,13 +95,25 @@ router.put('/usuarios/:id', async (req, res) => {
 
         await connection.execute(
             `UPDATE USUARIOS_CONTABLES
-             SET USERNAME = :USERNAME,
-                 PASSWORD_HASH = :PASSWORD_HASH,
-                 ROL = :ROL
-             WHERE USER_ID = :id`,
+            SET USERNAME = :USERNAME,
+            PASSWORD_HASH = :PASSWORD_HASH,
+            ROL = :ROL
+            WHERE USER_ID = :id`,
             { USERNAME, PASSWORD_HASH, ROL, id },
             { autoCommit: true }
         );
+
+        await connection.execute(
+            `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
+            VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
+            {
+            USER_ID: req.body.LOGGED_USER_ID || null,
+            ACCION: 'UPDATE',
+            TABLA_AFECTADA: 'USUARIOS_CONTABLES',
+            REGISTRO_ID: parseInt(id)
+            },
+            { autoCommit: true }
+            );
 
         res.json({ message: "Usuario actualizado correctamente" });
     } catch (err) {
@@ -113,6 +137,18 @@ router.delete('/usuarios/:id', async (req, res) => {
             { autoCommit: true }
         );
 
+        await connection.execute(
+            `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
+            VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
+            {
+            USER_ID: req.body.LOGGED_USER_ID || null,
+            ACCION: 'DELETE',
+            TABLA_AFECTADA: 'USUARIOS_CONTABLES',
+            REGISTRO_ID: parseInt(id)
+            },
+            { autoCommit: true }
+        );
+
         res.json({ message: "Usuario eliminado correctamente" });
     } catch (err) {
         res.status(500).send(err.message);
@@ -131,7 +167,7 @@ router.post('/usuarios/login', async (req, res) => {
 
         const result = await connection.execute(
             `SELECT USER_ID, USERNAME, ROL FROM USUARIOS_CONTABLES
-             WHERE USERNAME = :USERNAME AND PASSWORD_HASH = :PASSWORD_HASH`,
+            WHERE USERNAME = :USERNAME AND PASSWORD_HASH = :PASSWORD_HASH`,
             { USERNAME, PASSWORD_HASH },
             { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );

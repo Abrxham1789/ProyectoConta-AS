@@ -40,6 +40,18 @@ router.post('/cuentas', async (req, res) => {
         { autoCommit: true }
     );
 
+    await connection.execute(
+        `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
+        VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
+        {
+        USER_ID: req.body.LOGGED_USER_ID || null,
+        ACCION: 'INSERT',
+        TABLA_AFECTADA: 'CATALOGO_CUENTAS',
+        REGISTRO_ID: req.body.CUENTA_ID || null
+        },
+        { autoCommit: true }
+    );
+
     res.json({ message: "Cuenta creada correctamente" });
 
     } catch (err) {
@@ -142,6 +154,18 @@ router.put('/cuentas/:id', async (req, res) => {
         { autoCommit: true }
     );
 
+    await connection.execute(
+        `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
+        VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
+        {
+        USER_ID: req.body.LOGGED_USER_ID || null,
+        ACCION: 'UPDATE',
+        TABLA_AFECTADA: 'CATALOGO_CUENTAS',
+        REGISTRO_ID: parseInt(id)
+        },
+        { autoCommit: true }
+    );
+
     res.json({ message: "Cuenta actualizada correctamente" });
 
     } catch (err) {
@@ -165,6 +189,18 @@ router.delete('/cuentas/:id', async (req, res) => {
         `DELETE FROM CATALOGO_CUENTAS
         WHERE CUENTA_ID = :id`,
         { id },
+        { autoCommit: true }
+    );
+
+    await connection.execute(
+        `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
+        VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
+        {
+        USER_ID: req.body.LOGGED_USER_ID || null,
+        ACCION: 'DELETE',
+        TABLA_AFECTADA: 'CATALOGO_CUENTAS',
+        REGISTRO_ID: parseInt(id)
+        },
         { autoCommit: true }
     );
 

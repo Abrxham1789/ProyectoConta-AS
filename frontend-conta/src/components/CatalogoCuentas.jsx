@@ -1,3 +1,4 @@
+import { useAuth } from '../context/AuthContext';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import cuentasService from '../services/cuentasService';
@@ -5,6 +6,7 @@ import Toast from './Toast';
 
 function CatalogoCuentas() {
     const navigate = useNavigate();
+    const { usuario } = useAuth();
     const [cuentas, setCuentas] = useState([]);
     const [mensaje, setMensaje] = useState({ texto: '', tipo: '' });
     const [form, setForm] = useState({
@@ -37,7 +39,7 @@ function CatalogoCuentas() {
 
     const handleCrear = async () => {
         try {
-            await cuentasService.create(form);
+            await cuentasService.create(form, usuario.USER_ID);
             mostrarMensaje('Cuenta creada correctamente', 'exito');
             cargarCuentas();
         } catch (err) { mostrarMensaje('Error al crear cuenta', 'error'); }
@@ -47,7 +49,7 @@ function CatalogoCuentas() {
 
     const handleEliminar = async () => {
         try {
-            await cuentasService.delete(modalEliminar.id);
+            await cuentasService.delete(modalEliminar.id, usuario.USER_ID);
             setModalEliminar({ visible: false, id: null });
             mostrarMensaje('Cuenta eliminada correctamente', 'exito');
             cargarCuentas();
@@ -61,7 +63,7 @@ function CatalogoCuentas() {
 
     const handleActualizar = async () => {
         try {
-            await cuentasService.update(formEditar.CUENTA_ID, formEditar);
+            await cuentasService.update(formEditar.CUENTA_ID, formEdita, usuario.USER_ID);
             setModalVisible(false);
             mostrarMensaje('Cuenta actualizada correctamente', 'exito');
             cargarCuentas();

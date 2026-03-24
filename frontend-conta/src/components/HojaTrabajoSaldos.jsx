@@ -1,3 +1,4 @@
+import { useAuth } from '../context/AuthContext';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import hojaTrabajoService from '../services/hojaTrabajoService';
@@ -5,6 +6,7 @@ import Toast from './Toast';
 
 function HojaTrabajoSaldos() {
     const navigate = useNavigate();
+    const { usuario } = useAuth();
     const [saldos, setSaldos] = useState([]);
     const [mensaje, setMensaje] = useState({ texto: '', tipo: '' });
     const [form, setForm] = useState({ ANIO: '', MES: '', CUENTA_ID: '', SALDO_DEUDOR: '', SALDO_ACREEDOR: '', AJUSTE_DEBE: '', AJUSTE_HABER: '' });
@@ -31,7 +33,7 @@ function HojaTrabajoSaldos() {
 
     const handleCrear = async () => {
         try {
-            await hojaTrabajoService.create(form);
+            await hojaTrabajoService.create(form, usuario.USER_ID);
             mostrarMensaje('Saldo creado correctamente', 'exito');
             cargarSaldos();
         } catch (err) { mostrarMensaje('Error al crear saldo', 'error'); }
@@ -41,7 +43,7 @@ function HojaTrabajoSaldos() {
 
     const handleEliminar = async () => {
         try {
-            await hojaTrabajoService.delete(modalEliminar.anio, modalEliminar.mes, modalEliminar.cuentaId);
+            await hojaTrabajoService.delete(modalEliminar.anio, modalEliminar.mes, modalEliminar.cuentaId, usuario.USER_ID);
             setModalEliminar({ visible: false, anio: null, mes: null, cuentaId: null });
             mostrarMensaje('Saldo eliminado correctamente', 'exito');
             cargarSaldos();
@@ -55,7 +57,7 @@ function HojaTrabajoSaldos() {
 
     const handleActualizar = async () => {
         try {
-            await hojaTrabajoService.update(formEditar.ANIO, formEditar.MES, formEditar.CUENTA_ID, formEditar);
+            await hojaTrabajoService.update(formEditar.ANIO, formEditar.MES, formEditar.CUENTA_ID, formEditar, usuario.USER_ID);
             setModalVisible(false);
             mostrarMensaje('Saldo actualizado correctamente', 'exito');
             cargarSaldos();

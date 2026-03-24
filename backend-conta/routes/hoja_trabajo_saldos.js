@@ -13,14 +13,26 @@ router.post('/hoja-trabajo', async (req, res) => {
 
         await connection.execute(
             `INSERT INTO HOJA_TRABAJO_SALDOS
-             (ANIO, MES, CUENTA_ID, SALDO_DEUDOR, SALDO_ACREEDOR, AJUSTE_DEBE, AJUSTE_HABER)
-             VALUES (:ANIO, :MES, :CUENTA_ID, :SALDO_DEUDOR, :SALDO_ACREEDOR, :AJUSTE_DEBE, :AJUSTE_HABER)`,
+            (ANIO, MES, CUENTA_ID, SALDO_DEUDOR, SALDO_ACREEDOR, AJUSTE_DEBE, AJUSTE_HABER)
+            VALUES (:ANIO, :MES, :CUENTA_ID, :SALDO_DEUDOR, :SALDO_ACREEDOR, :AJUSTE_DEBE, :AJUSTE_HABER)`,
             {
                 ANIO, MES, CUENTA_ID,
                 SALDO_DEUDOR: SALDO_DEUDOR || 0,
                 SALDO_ACREEDOR: SALDO_ACREEDOR || 0,
                 AJUSTE_DEBE: AJUSTE_DEBE || 0,
                 AJUSTE_HABER: AJUSTE_HABER || 0
+            },
+            { autoCommit: true }
+        );
+
+        await connection.execute(
+            `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
+            VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
+            {
+            USER_ID: req.body.LOGGED_USER_ID || null,
+            ACCION: 'INSERT',
+            TABLA_AFECTADA: 'HOJA_TRABAJO_SALDOS',
+            REGISTRO_ID: null
             },
             { autoCommit: true }
         );
@@ -41,9 +53,9 @@ router.get('/hoja-trabajo', async (req, res) => {
 
         const result = await connection.execute(
             `SELECT h.*, c.NOMBRE AS NOMBRE_CUENTA
-             FROM HOJA_TRABAJO_SALDOS h
-             JOIN CATALOGO_CUENTAS c ON h.CUENTA_ID = c.CUENTA_ID
-             ORDER BY h.ANIO DESC, h.MES DESC, h.CUENTA_ID`,
+            FROM HOJA_TRABAJO_SALDOS h
+            JOIN CATALOGO_CUENTAS c ON h.CUENTA_ID = c.CUENTA_ID
+            ORDER BY h.ANIO DESC, h.MES DESC, h.CUENTA_ID`,
             [],
             { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );
@@ -66,10 +78,10 @@ router.get('/hoja-trabajo/:anio/:mes', async (req, res) => {
 
         const result = await connection.execute(
             `SELECT h.*, c.NOMBRE AS NOMBRE_CUENTA
-             FROM HOJA_TRABAJO_SALDOS h
-             JOIN CATALOGO_CUENTAS c ON h.CUENTA_ID = c.CUENTA_ID
-             WHERE h.ANIO = :anio AND h.MES = :mes
-             ORDER BY h.CUENTA_ID`,
+            FROM HOJA_TRABAJO_SALDOS h
+            JOIN CATALOGO_CUENTAS c ON h.CUENTA_ID = c.CUENTA_ID
+            WHERE h.ANIO = :anio AND h.MES = :mes
+            ORDER BY h.CUENTA_ID`,
             { anio, mes },
             { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );
@@ -93,17 +105,29 @@ router.put('/hoja-trabajo/:anio/:mes/:cuentaId', async (req, res) => {
 
         await connection.execute(
             `UPDATE HOJA_TRABAJO_SALDOS
-             SET SALDO_DEUDOR = :SALDO_DEUDOR,
-                 SALDO_ACREEDOR = :SALDO_ACREEDOR,
-                 AJUSTE_DEBE = :AJUSTE_DEBE,
-                 AJUSTE_HABER = :AJUSTE_HABER
-             WHERE ANIO = :anio AND MES = :mes AND CUENTA_ID = :cuentaId`,
+            SET SALDO_DEUDOR = :SALDO_DEUDOR,
+            SALDO_ACREEDOR = :SALDO_ACREEDOR,
+            AJUSTE_DEBE = :AJUSTE_DEBE,
+            AJUSTE_HABER = :AJUSTE_HABER
+            WHERE ANIO = :anio AND MES = :mes AND CUENTA_ID = :cuentaId`,
             {
                 SALDO_DEUDOR: SALDO_DEUDOR || 0,
                 SALDO_ACREEDOR: SALDO_ACREEDOR || 0,
                 AJUSTE_DEBE: AJUSTE_DEBE || 0,
                 AJUSTE_HABER: AJUSTE_HABER || 0,
                 anio, mes, cuentaId
+            },
+            { autoCommit: true }
+        );
+
+            await connection.execute(
+            `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
+            VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
+            {
+            USER_ID: req.body.LOGGED_USER_ID || null,
+            ACCION: 'UPDATE',
+            TABLA_AFECTADA: 'HOJA_TRABAJO_SALDOS',
+            REGISTRO_ID: null
             },
             { autoCommit: true }
         );
@@ -126,8 +150,20 @@ router.delete('/hoja-trabajo/:anio/:mes/:cuentaId', async (req, res) => {
 
         await connection.execute(
             `DELETE FROM HOJA_TRABAJO_SALDOS
-             WHERE ANIO = :anio AND MES = :mes AND CUENTA_ID = :cuentaId`,
+            WHERE ANIO = :anio AND MES = :mes AND CUENTA_ID = :cuentaId`,
             { anio, mes, cuentaId },
+            { autoCommit: true }
+        );
+
+        await connection.execute(
+            `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
+            VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
+            {
+            USER_ID: req.body.LOGGED_USER_ID || null,
+            ACCION: 'DELETE',
+            TABLA_AFECTADA: 'HOJA_TRABAJO_SALDOS',
+            REGISTRO_ID: null
+            },
             { autoCommit: true }
         );
 

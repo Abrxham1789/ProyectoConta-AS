@@ -13,8 +13,20 @@ router.post('/polizas-detalle', async (req, res) => {
 
         await connection.execute(
             `INSERT INTO POLIZAS_DETALLE (POLIZA_ID, CUENTA_ID, DEBE, HABER)
-             VALUES (:POLIZA_ID, :CUENTA_ID, :DEBE, :HABER)`,
+            VALUES (:POLIZA_ID, :CUENTA_ID, :DEBE, :HABER)`,
             { POLIZA_ID, CUENTA_ID, DEBE: DEBE || 0, HABER: HABER || 0 },
+            { autoCommit: true }
+        );
+
+        await connection.execute(
+            `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
+            VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
+            {
+            USER_ID: req.body.LOGGED_USER_ID || null,
+            ACCION: 'INSERT',
+            TABLA_AFECTADA: 'POLIZAS_DETALLE',
+            REGISTRO_ID: null
+            },
             { autoCommit: true }
         );
 
@@ -33,10 +45,13 @@ router.get('/polizas-detalle', async (req, res) => {
         connection = await getConnection();
 
         const result = await connection.execute(
-            `SELECT * FROM POLIZAS_DETALLE ORDER BY DETALLE_ID`,
-            [],
-            { outFormat: oracledb.OUT_FORMAT_OBJECT }
-        );
+        `SELECT pd.*, cc.NOMBRE AS NOMBRE_CUENTA
+        FROM POLIZAS_DETALLE pd
+        JOIN CATALOGO_CUENTAS cc ON pd.CUENTA_ID = cc.CUENTA_ID
+        ORDER BY pd.DETALLE_ID`,
+    [],
+    { outFormat: oracledb.OUT_FORMAT_OBJECT }
+);
 
         res.json(result.rows);
     } catch (err) {
@@ -56,10 +71,10 @@ router.get('/polizas-detalle/poliza/:polizaId', async (req, res) => {
 
         const result = await connection.execute(
             `SELECT pd.*, cc.NOMBRE AS NOMBRE_CUENTA
-             FROM POLIZAS_DETALLE pd
-             JOIN CATALOGO_CUENTAS cc ON pd.CUENTA_ID = cc.CUENTA_ID
-             WHERE pd.POLIZA_ID = :polizaId
-             ORDER BY pd.DETALLE_ID`,
+            FROM POLIZAS_DETALLE pd
+            JOIN CATALOGO_CUENTAS cc ON pd.CUENTA_ID = cc.CUENTA_ID
+            WHERE pd.POLIZA_ID = :polizaId
+            ORDER BY pd.DETALLE_ID`,
             { polizaId },
             { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );
@@ -82,9 +97,9 @@ router.get('/polizas-detalle/:id', async (req, res) => {
 
         const result = await connection.execute(
             `SELECT pd.*, cc.NOMBRE AS NOMBRE_CUENTA
-             FROM POLIZAS_DETALLE pd
-             JOIN CATALOGO_CUENTAS cc ON pd.CUENTA_ID = cc.CUENTA_ID
-             WHERE pd.DETALLE_ID = :id`,
+            FROM POLIZAS_DETALLE pd
+            JOIN CATALOGO_CUENTAS cc ON pd.CUENTA_ID = cc.CUENTA_ID
+            WHERE pd.DETALLE_ID = :id`,
             { id },
             { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );
@@ -113,12 +128,24 @@ router.put('/polizas-detalle/:id', async (req, res) => {
 
         await connection.execute(
             `UPDATE POLIZAS_DETALLE
-             SET POLIZA_ID = :POLIZA_ID,
-                 CUENTA_ID = :CUENTA_ID,
-                 DEBE = :DEBE,
-                 HABER = :HABER
-             WHERE DETALLE_ID = :id`,
+            SET POLIZA_ID = :POLIZA_ID,
+                CUENTA_ID = :CUENTA_ID,
+                DEBE = :DEBE,
+                HABER = :HABER
+            WHERE DETALLE_ID = :id`,
             { POLIZA_ID, CUENTA_ID, DEBE: DEBE || 0, HABER: HABER || 0, id },
+            { autoCommit: true }
+        );
+
+        await connection.execute(
+            `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
+            VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
+            {
+            USER_ID: req.body.LOGGED_USER_ID || null,
+            ACCION: 'UPDATE',
+            TABLA_AFECTADA: 'POLIZAS_DETALLE',
+            REGISTRO_ID: null
+            },
             { autoCommit: true }
         );
 
@@ -143,6 +170,18 @@ router.delete('/polizas-detalle/:id', async (req, res) => {
             { id },
             { autoCommit: true }
         );
+
+        await connection.execute(
+            `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
+            VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
+            {
+            USER_ID: req.body.LOGGED_USER_ID || null,
+            ACCION: 'DELETE',
+            TABLA_AFECTADA: 'POLIZAS_DETALLE',
+            REGISTRO_ID: null
+            },
+            { autoCommit: true }
+        );        
 
         res.json({ message: "Detalle eliminado correctamente" });
     } catch (err) {

@@ -1,3 +1,4 @@
+import { useAuth } from '../context/AuthContext';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import polizasCabeceraService from '../services/polizasCabeceraService';
@@ -5,6 +6,7 @@ import Toast from './Toast';
 
 function PolizasCabecera() {
     const navigate = useNavigate();
+    const { usuario } = useAuth();
     const [polizas, setPolizas] = useState([]);
     const [mensaje, setMensaje] = useState({ texto: '', tipo: '' });
     const [form, setForm] = useState({ ANIO: '', MES: '', NUM_POLIZA: '', FECHA: '', TIPO_POLIZA: '', ESTADO: 'BORRADOR', SINOPSIS: '' });
@@ -31,7 +33,7 @@ function PolizasCabecera() {
 
     const handleCrear = async () => {
         try {
-            await polizasCabeceraService.create(form);
+            await polizasCabeceraService.create(form, usuario.USER_ID);
             mostrarMensaje('Poliza creada correctamente', 'exito');
             cargarPolizas();
         } catch (err) { mostrarMensaje('Error al crear poliza', 'error'); }
@@ -41,7 +43,7 @@ function PolizasCabecera() {
 
     const handleEliminar = async () => {
         try {
-            await polizasCabeceraService.delete(modalEliminar.id);
+            await polizasCabeceraService.delete(modalEliminar.id, usuario.USER_ID);
             setModalEliminar({ visible: false, id: null });
             mostrarMensaje('Poliza eliminada correctamente', 'exito');
             cargarPolizas();
@@ -55,7 +57,7 @@ function PolizasCabecera() {
 
     const handleActualizar = async () => {
         try {
-            await polizasCabeceraService.update(formEditar.POLIZA_ID, formEditar);
+            await polizasCabeceraService.update(formEditar.POLIZA_ID, formEditar, usuario.USER_ID);
             setModalVisible(false);
             mostrarMensaje('Poliza actualizada correctamente', 'exito');
             cargarPolizas();

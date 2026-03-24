@@ -83,13 +83,25 @@ router.put('/configuracion-reportes/:id', async (req, res) => {
 
         await connection.execute(
             `UPDATE CONFIGURACION_REPORTES
-             SET NOMBRE_REPORTE = :NOMBRE_REPORTE,
-                 SECCION = :SECCION,
-                 CUENTA_ID = :CUENTA_ID,
-                 ORDEN = :ORDEN,
-                 OPERACION = :OPERACION
-             WHERE CONFIG_ID = :id`,
+            SET NOMBRE_REPORTE = :NOMBRE_REPORTE,
+            SECCION = :SECCION,
+            CUENTA_ID = :CUENTA_ID,
+            ORDEN = :ORDEN,
+            OPERACION = :OPERACION
+            WHERE CONFIG_ID = :id`,
             { NOMBRE_REPORTE, SECCION, CUENTA_ID, ORDEN, OPERACION, id },
+            { autoCommit: true }
+        );
+
+        await connection.execute(
+            `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
+            VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
+            {
+            USER_ID: req.body.LOGGED_USER_ID || null,
+            ACCION: 'UPDATE',
+            TABLA_AFECTADA: 'CONFIGURACION_REPORTES',
+            REGISTRO_ID: req.body.CONFIG_ID || null
+            },
             { autoCommit: true }
         );
 
@@ -112,6 +124,18 @@ router.delete('/configuracion-reportes/:id', async (req, res) => {
         await connection.execute(
             `DELETE FROM CONFIGURACION_REPORTES WHERE CONFIG_ID = :id`,
             { id },
+            { autoCommit: true }
+        );
+
+        await connection.execute(
+            `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
+            VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
+            {
+            USER_ID: req.body.LOGGED_USER_ID || null,
+            ACCION: 'DELETE',
+            TABLA_AFECTADA: 'CONFIGURACION_REPORTES',
+            REGISTRO_ID: req.body.CONFIG_ID || null
+            },
             { autoCommit: true }
         );
 

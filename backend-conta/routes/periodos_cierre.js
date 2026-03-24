@@ -13,8 +13,20 @@ router.post('/periodos', async (req, res) => {
 
         await connection.execute(
             `INSERT INTO PERIODOS_CIERRE (ANIO, MES, ESTADO_CIERRE, FECHA_CIERRE)
-             VALUES (:ANIO, :MES, :ESTADO_CIERRE, TO_DATE(:FECHA_CIERRE, 'YYYY-MM-DD'))`,
+            VALUES (:ANIO, :MES, :ESTADO_CIERRE, TO_DATE(:FECHA_CIERRE, 'YYYY-MM-DD'))`,
             { ANIO, MES, ESTADO_CIERRE: ESTADO_CIERRE || 'ABIERTO', FECHA_CIERRE: FECHA_CIERRE || null },
+            { autoCommit: true }
+        );
+
+        await connection.execute(
+            `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
+            VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
+            {
+            USER_ID: req.body.LOGGED_USER_ID || null,
+            ACCION: 'INSERT',
+            TABLA_AFECTADA: 'PERIODOS_CIERRE',
+            REGISTRO_ID: null
+            },
             { autoCommit: true }
         );
 
@@ -83,10 +95,22 @@ router.put('/periodos/:anio/:mes', async (req, res) => {
 
         await connection.execute(
             `UPDATE PERIODOS_CIERRE
-             SET ESTADO_CIERRE = :ESTADO_CIERRE,
-                 FECHA_CIERRE = TO_DATE(:FECHA_CIERRE, 'YYYY-MM-DD')
-             WHERE ANIO = :anio AND MES = :mes`,
+            SET ESTADO_CIERRE = :ESTADO_CIERRE,
+            FECHA_CIERRE = TO_DATE(:FECHA_CIERRE, 'YYYY-MM-DD')
+            WHERE ANIO = :anio AND MES = :mes`,
             { ESTADO_CIERRE, FECHA_CIERRE: FECHA_CIERRE || null, anio, mes },
+            { autoCommit: true }
+        );
+
+        await connection.execute(
+            `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
+            VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
+            {
+            USER_ID: req.body.LOGGED_USER_ID || null,
+            ACCION: 'UPDATE',
+            TABLA_AFECTADA: 'PERIODOS_CIERRE',
+            REGISTRO_ID: null
+            },
             { autoCommit: true }
         );
 
@@ -109,6 +133,18 @@ router.delete('/periodos/:anio/:mes', async (req, res) => {
         await connection.execute(
             `DELETE FROM PERIODOS_CIERRE WHERE ANIO = :anio AND MES = :mes`,
             { anio, mes },
+            { autoCommit: true }
+        );
+
+        await connection.execute(
+            `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
+            VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
+            {
+            USER_ID: req.body.LOGGED_USER_ID || null,
+            ACCION: 'DELETE',
+            TABLA_AFECTADA: 'PERIODOS_CIERRE',
+            REGISTRO_ID: null
+            },
             { autoCommit: true }
         );
 

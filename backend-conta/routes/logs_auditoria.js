@@ -13,10 +13,22 @@ router.post('/logs', async (req, res) => {
 
         await connection.execute(
             `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
-             VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
+            VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
             { USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID: REGISTRO_ID || null },
             { autoCommit: true }
         );
+
+        await connection.execute(
+            `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
+            VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
+    {
+        USER_ID: req.body.LOGGED_USER_ID || null,
+        ACCION: 'INSERT',
+        TABLA_AFECTADA: 'LOGS_AUDITORIA',
+        REGISTRO_ID: null
+    },
+    { autoCommit: true }
+);
 
         res.json({ message: "Log registrado correctamente" });
     } catch (err) {
@@ -34,9 +46,9 @@ router.get('/logs', async (req, res) => {
 
         const result = await connection.execute(
             `SELECT l.*, u.USERNAME
-             FROM LOGS_AUDITORIA l
-             LEFT JOIN USUARIOS_CONTABLES u ON l.USER_ID = u.USER_ID
-             ORDER BY l.FECHA_HORA DESC`,
+            FROM LOGS_AUDITORIA l
+            LEFT JOIN USUARIOS_CONTABLES u ON l.USER_ID = u.USER_ID
+            ORDER BY l.FECHA_HORA DESC`,
             [],
             { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );
@@ -59,9 +71,9 @@ router.get('/logs/:id', async (req, res) => {
 
         const result = await connection.execute(
             `SELECT l.*, u.USERNAME
-             FROM LOGS_AUDITORIA l
-             LEFT JOIN USUARIOS_CONTABLES u ON l.USER_ID = u.USER_ID
-             WHERE l.LOG_ID = :id`,
+            FROM LOGS_AUDITORIA l
+            LEFT JOIN USUARIOS_CONTABLES u ON l.USER_ID = u.USER_ID
+            WHERE l.LOG_ID = :id`,
             { id },
             { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );
@@ -88,10 +100,10 @@ router.get('/logs/usuario/:userId', async (req, res) => {
 
         const result = await connection.execute(
             `SELECT l.*, u.USERNAME
-             FROM LOGS_AUDITORIA l
-             LEFT JOIN USUARIOS_CONTABLES u ON l.USER_ID = u.USER_ID
-             WHERE l.USER_ID = :userId
-             ORDER BY l.FECHA_HORA DESC`,
+            FROM LOGS_AUDITORIA l
+            LEFT JOIN USUARIOS_CONTABLES u ON l.USER_ID = u.USER_ID
+            WHERE l.USER_ID = :userId
+            ORDER BY l.FECHA_HORA DESC`,
             { userId },
             { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );
@@ -115,12 +127,24 @@ router.put('/logs/:id', async (req, res) => {
 
         await connection.execute(
             `UPDATE LOGS_AUDITORIA
-             SET USER_ID = :USER_ID,
-                 ACCION = :ACCION,
-                 TABLA_AFECTADA = :TABLA_AFECTADA,
-                 REGISTRO_ID = :REGISTRO_ID
-             WHERE LOG_ID = :id`,
+            SET USER_ID = :USER_ID,
+            ACCION = :ACCION,
+            TABLA_AFECTADA = :TABLA_AFECTADA,
+            REGISTRO_ID = :REGISTRO_ID
+            WHERE LOG_ID = :id`,
             { USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID: REGISTRO_ID || null, id },
+            { autoCommit: true }
+        );
+
+        await connection.execute(
+            `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
+            VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
+            {
+            USER_ID: req.body.LOGGED_USER_ID || null,
+            ACCION: 'UPDATE',
+            TABLA_AFECTADA: 'LOGS_AUDITORIA',
+            REGISTRO_ID: null
+            },
             { autoCommit: true }
         );
 
@@ -143,6 +167,18 @@ router.delete('/logs/:id', async (req, res) => {
         await connection.execute(
             `DELETE FROM LOGS_AUDITORIA WHERE LOG_ID = :id`,
             { id },
+            { autoCommit: true }
+        );
+
+        await connection.execute(
+            `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
+            VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
+            {
+            USER_ID: req.body.LOGGED_USER_ID || null,
+            ACCION: 'DELETE',
+            TABLA_AFECTADA: 'LOGS_AUDITORIA',
+            REGISTRO_ID: null
+            },
             { autoCommit: true }
         );
 
