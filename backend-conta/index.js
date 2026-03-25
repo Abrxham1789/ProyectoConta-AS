@@ -11,6 +11,7 @@ console.log("----------------------------");
 const { getConnection, initialize } = require('./database');
 
 // importar rutas
+const reportesRoutes = require('./routes/reportes');
 const cuentasRoutes = require('./routes/catalogo_cuentas');
 const periodosRoutes = require('./routes/periodos_cierre');
 const polizasCabeceraRoutes = require('./routes/polizas_cabecera');
@@ -27,6 +28,7 @@ app.use(cors());
 app.use(express.json());
 
 // usar rutas
+app.use('/api', reportesRoutes);
 app.use('/api', cuentasRoutes);
 app.use('/api', periodosRoutes);
 app.use('/api', polizasCabeceraRoutes);

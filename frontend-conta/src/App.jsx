@@ -1,12 +1,11 @@
 import { BrowserRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
+import Reportes from './components/Reportes';
 import Polizas from './components/Polizas';
 import Login from './components/Login';
 import RutaProtegida from './components/RutaProtegida';
 import CatalogoCuentas from './components/CatalogoCuentas';
 import Periodos from './components/Periodos';
-import PolizasCabecera from './components/PolizasCabecera';
-import PolizasDetalle from './components/PolizasDetalle';
 import ConfiguracionReportes from './components/ConfiguracionReportes';
 import HojaTrabajoSaldos from './components/HojaTrabajoSaldos';
 import UsuariosContables from './components/UsuariosContables';
@@ -16,9 +15,8 @@ const modulos = [
     { label: 'Catálogo de Cuentas', path: '/cuentas', icon: '📒' },
     { label: 'Pólizas Contables', path: '/polizas', icon: '📒' },
     { label: 'Periodos de Cierre', path: '/periodos', icon: '📅' },
-    { label: 'Pólizas Cabecera', path: '/polizas-cabecera', icon: '📋' },
-    { label: 'Pólizas Detalle', path: '/polizas-detalle', icon: '📝' },
     { label: 'Configuración Reportes', path: '/configuracion-reportes', icon: '⚙️' },
+    { label: 'Reportes Financieros', path: '/reportes', icon: '📈' },
     { label: 'Hoja de Trabajo', path: '/hoja-trabajo', icon: '📊' },
     { label: 'Usuarios', path: '/usuarios', icon: '👤' },
     { label: 'Logs Auditoría', path: '/logs', icon: '🔍' },
@@ -92,8 +90,7 @@ function App() {
                 <Route path="/" element={<RutaProtegida><Home /></RutaProtegida>} />
                 <Route path="/cuentas" element={<RutaProtegida><CatalogoCuentas /></RutaProtegida>} />
                 <Route path="/periodos" element={<RutaProtegida><Periodos /></RutaProtegida>} />
-                <Route path="/polizas-cabecera" element={<RutaProtegida><PolizasCabecera /></RutaProtegida>} />
-                <Route path="/polizas-detalle" element={<RutaProtegida><PolizasDetalle /></RutaProtegida>} />
+                <Route path="/reportes" element={<RutaProtegida><Reportes /></RutaProtegida>} />
                 <Route path="/configuracion-reportes" element={<RutaProtegida><ConfiguracionReportes /></RutaProtegida>} />
                 <Route path="/hoja-trabajo" element={<RutaProtegida><HojaTrabajoSaldos /></RutaProtegida>} />
                 <Route path="/usuarios" element={<RutaProtegida><UsuariosContables /></RutaProtegida>} />
