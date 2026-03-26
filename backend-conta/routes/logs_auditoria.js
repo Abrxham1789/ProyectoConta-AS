@@ -21,14 +21,14 @@ router.post('/logs', async (req, res) => {
         await connection.execute(
             `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
             VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
-    {
-        USER_ID: req.body.LOGGED_USER_ID || null,
-        ACCION: 'INSERT',
-        TABLA_AFECTADA: 'LOGS_AUDITORIA',
-        REGISTRO_ID: null
-    },
-    { autoCommit: true }
-);
+            {
+            USER_ID: req.body.LOGGED_USER_ID || null,
+            ACCION: 'INSERT',
+            TABLA_AFECTADA: 'LOGS_AUDITORIA',
+            REGISTRO_ID: null
+            },
+            { autoCommit: true }
+        );
 
         res.json({ message: "Log registrado correctamente" });
     } catch (err) {
