@@ -282,9 +282,11 @@ function Polizas() {
                                         </td>
                                         <td className="px-4 py-3 text-gray-600">{p.SINOPSIS}</td>
                                         <td className="px-4 py-3 text-center">
-                                            <button onClick={() => verDetallesPoliza(p.POLIZA_ID)} className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded-lg text-xs font-medium mr-2 transition-all">Ver</button>
-                                            <button onClick={() => handleAbrirModal(p)} className="bg-[#2E75B6] hover:bg-[#1E3A5F] text-white px-3 py-1 rounded-lg text-xs font-medium mr-2 transition-all">Editar</button>
-                                            <button onClick={() => confirmarEliminar(p.POLIZA_ID)} className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg text-xs font-medium transition-all">Eliminar</button>
+                                            <div className="flex flex-wrap gap-2 justify-center items-center">
+                                                <button onClick={() => verDetallesPoliza(p.POLIZA_ID)} className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded-lg text-xs font-medium transition-all">Ver</button>
+                                                <button onClick={() => handleAbrirModal(p)} className="bg-[#2E75B6] hover:bg-[#1E3A5F] text-white px-3 py-1 rounded-lg text-xs font-medium transition-all">Editar</button>
+                                                <button onClick={() => confirmarEliminar(p.POLIZA_ID)} className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg text-xs font-medium transition-all">Eliminar</button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

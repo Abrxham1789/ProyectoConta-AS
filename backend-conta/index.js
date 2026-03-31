@@ -79,4 +79,18 @@ async function startServer() {
   }
 }
 
+// Mantener el pool activo con ping cada 4 minutos
+setInterval(async () => {
+    let connection;
+    try {
+        connection = await getConnection();
+        await connection.execute('SELECT 1 FROM DUAL');
+    } catch (err) {
+        console.log('Keep-alive error:', err.message);
+    } finally {
+        if (connection) await connection.close();
+    }
+}, 240000);
+
 startServer();
+
