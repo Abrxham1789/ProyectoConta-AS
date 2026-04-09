@@ -175,6 +175,11 @@ router.post('/polizas-unificado', async (req, res) => {
     try {
         const { ANIO, MES, NUM_POLIZA, FECHA, TIPO_POLIZA, ESTADO, SINOPSIS, DETALLES, LOGGED_USER_ID } = req.body;
 
+        // Validación: partida doble requiere mínimo 2 líneas de detalle
+        if (!DETALLES || DETALLES.length < 2) {
+            return res.status(400).json({ message: "La póliza debe contener al menos 2 líneas de detalle (partida doble)." });
+        }
+
         connection = await getConnection();
 
         // 1. Insertar cabecera y obtener el POLIZA_ID generado

@@ -12,6 +12,8 @@ function Reportes() {
     const [reporteActivo, setReporteActivo] = useState(null);
     const [datos, setDatos] = useState([]);
     const [cargando, setCargando] = useState(false);
+    const [filtros, setFiltros] = useState({ cuenta: '', fechaDesde: '', fechaHasta: '' });
+    const [datosCrudos, setDatosCrudos] = useState([]);
 
     const mostrarMensaje = (texto, tipo) => {
         setMensaje({ texto, tipo });
@@ -22,17 +24,62 @@ function Reportes() {
         setCargando(true);
         setReporteActivo(tipo);
         setDatos([]);
+        setDatosCrudos([]);
         try {
             let res;
             if (tipo === 'libro-diario') res = await reportesService.getLibroDiario();
             else if (tipo === 'balance-general') res = await reportesService.getBalanceGeneral();
             else if (tipo === 'estado-resultados') res = await reportesService.getEstadoResultados();
-            setDatos(res.data);
+            setDatosCrudos(res.data);
+            aplicarFiltros(res.data, filtros, tipo);
         } catch (err) {
             mostrarMensaje('Error al cargar el reporte', 'error');
         } finally {
             setCargando(false);
         }
+    };
+
+    const aplicarFiltros = (fuente, f, tipo) => {
+        let resultado = [...fuente];
+        const tipoActivo = tipo || reporteActivo;
+
+        if (f.cuenta.trim() !== '') {
+            const busqueda = f.cuenta.toLowerCase();
+            if (tipoActivo === 'libro-diario') {
+                resultado = resultado.filter(d =>
+                    String(d.CUENTA_ID).toLowerCase().includes(busqueda) ||
+                    (d.NOMBRE_CUENTA && d.NOMBRE_CUENTA.toLowerCase().includes(busqueda))
+                );
+            } else {
+                resultado = resultado.filter(d =>
+                    String(d.CUENTA_ID).toLowerCase().includes(busqueda) ||
+                    (d.NOMBRE && d.NOMBRE.toLowerCase().includes(busqueda))
+                );
+            }
+        }
+
+        if (tipoActivo === 'libro-diario') {
+            if (f.fechaDesde.trim() !== '') {
+                resultado = resultado.filter(d => d.FECHA && d.FECHA >= f.fechaDesde);
+            }
+            if (f.fechaHasta.trim() !== '') {
+                resultado = resultado.filter(d => d.FECHA && d.FECHA <= f.fechaHasta);
+            }
+        }
+
+        setDatos(resultado);
+    };
+
+    const handleFiltro = (e) => {
+        const nuevosFiltros = { ...filtros, [e.target.name]: e.target.value };
+        setFiltros(nuevosFiltros);
+        aplicarFiltros(datosCrudos, nuevosFiltros, reporteActivo);
+    };
+
+    const limpiarFiltros = () => {
+        const f = { cuenta: '', fechaDesde: '', fechaHasta: '' };
+        setFiltros(f);
+        aplicarFiltros(datosCrudos, f, reporteActivo);
     };
 
     const totalActivos = datos.filter(d => d.RUBRO === 'ACTIVO').reduce((sum, d) => sum + (parseFloat(d.SALDO) || 0), 0);
@@ -165,6 +212,55 @@ const exportarExcel = () => {
                         {btnReporte('estado-resultados', 'Estado de Resultados', '📊')}
                     </div>
                 </div>
+
+                {/* Panel de filtros — aparece cuando hay un reporte activo */}
+                {reporteActivo && (
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+                        <h2 className="text-[#1E3A5F] font-bold text-base mb-4 pb-2 border-b border-gray-100">🔍 Filtros del Reporte</h2>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide">Buscar Cuenta</label>
+                                <input
+                                    name="cuenta"
+                                    value={filtros.cuenta}
+                                    onChange={handleFiltro}
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1E3A5F] focus:border-transparent"
+                                    placeholder="ID o nombre de cuenta..."
+                                />
+                            </div>
+                            {reporteActivo === 'libro-diario' && (
+                                <>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide">Fecha Desde</label>
+                                        <input
+                                            name="fechaDesde"
+                                            value={filtros.fechaDesde}
+                                            onChange={handleFiltro}
+                                            type="date"
+                                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1E3A5F] focus:border-transparent"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide">Fecha Hasta</label>
+                                        <input
+                                            name="fechaHasta"
+                                            value={filtros.fechaHasta}
+                                            onChange={handleFiltro}
+                                            type="date"
+                                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1E3A5F] focus:border-transparent"
+                                        />
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                        <div className="mt-4 flex items-center gap-3">
+                            <button onClick={limpiarFiltros} className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-all">
+                                Limpiar filtros
+                            </button>
+                            <span className="text-gray-400 text-sm">{datos.length} registro(s) visible(s)</span>
+                        </div>
+                    </div>
+                )}
 
                 {reporteActivo && datos.length > 0 && (
                 <div className="flex gap-3 mt-4">

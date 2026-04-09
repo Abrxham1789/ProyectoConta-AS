@@ -12,6 +12,7 @@ function Periodos() {
     const [form, setForm] = useState({ ANIO: '', MES: '', ESTADO_CIERRE: 'ABIERTO', FECHA_CIERRE: '' });
     const [modalVisible, setModalVisible] = useState(false);
     const [modalEliminar, setModalEliminar] = useState({ visible: false, anio: null, mes: null });
+    const [modalReabrir, setModalReabrir] = useState({ visible: false, anio: null, mes: null });
     const [formEditar, setFormEditar] = useState({ ANIO: '', MES: '', ESTADO_CIERRE: '', FECHA_CIERRE: '' });
 
     useEffect(() => { cargarPeriodos(); }, []);
@@ -62,6 +63,15 @@ function Periodos() {
             mostrarMensaje('Periodo actualizado correctamente', 'exito');
             cargarPeriodos();
         } catch (err) { mostrarMensaje('Error al actualizar periodo', 'error'); }
+    };
+
+    const handleReabrir = async () => {
+        try {
+            await periodosService.update(modalReabrir.anio, modalReabrir.mes, { ESTADO_CIERRE: 'ABIERTO', FECHA_CIERRE: '' }, usuario.USER_ID);
+            setModalReabrir({ visible: false, anio: null, mes: null });
+            mostrarMensaje(`Periodo ${modalReabrir.mes}/${modalReabrir.anio} reabierto correctamente`, 'exito');
+            cargarPeriodos();
+        } catch (err) { mostrarMensaje('Error al reabrir el periodo', 'error'); }
     };
 
     const inputClass = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1E3A5F] focus:border-transparent";
@@ -125,8 +135,16 @@ function Periodos() {
                                         </td>
                                         <td className="px-4 py-3 text-gray-600">{p.FECHA_CIERRE}</td>
                                         <td className="px-4 py-3 text-center">
-                                            <button onClick={() => handleAbrirModal(p)} className="bg-[#2E75B6] hover:bg-[#1E3A5F] text-white px-3 py-1 rounded-lg text-xs font-medium mr-2 transition-all">Editar</button>
-                                            <button onClick={() => confirmarEliminar(p.ANIO, p.MES)} className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg text-xs font-medium transition-all">Eliminar</button>
+                                            <div className="flex flex-wrap gap-2 justify-center">
+                                                {p.ESTADO_CIERRE === 'CERRADO' ? (
+                                                    <button onClick={() => setModalReabrir({ visible: true, anio: p.ANIO, mes: p.MES })} className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1 rounded-lg text-xs font-medium transition-all">🔓 Reabrir</button>
+                                                ) : (
+                                                    <>
+                                                        <button onClick={() => handleAbrirModal(p)} className="bg-[#2E75B6] hover:bg-[#1E3A5F] text-white px-3 py-1 rounded-lg text-xs font-medium transition-all">Editar</button>
+                                                        <button onClick={() => confirmarEliminar(p.ANIO, p.MES)} className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg text-xs font-medium transition-all">Eliminar</button>
+                                                    </>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -157,6 +175,28 @@ function Periodos() {
                         <div className="px-6 pb-6 flex gap-3 justify-end">
                             <button onClick={() => setModalVisible(false)} className="px-5 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-all">Cancelar</button>
                             <button onClick={handleActualizar} className="px-5 py-2 rounded-lg bg-[#1E3A5F] hover:bg-[#2a4f7c] text-white text-sm font-semibold transition-all">Guardar cambios</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {modalReabrir.visible && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4">
+                        <div className="bg-amber-500 text-white px-6 py-4 rounded-t-xl flex items-center justify-between">
+                            <h3 className="font-bold text-lg">⚠️ Reabrir Periodo</h3>
+                            <button onClick={() => setModalReabrir({ visible: false, anio: null, mes: null })} className="text-white/70 hover:text-white text-xl">✕</button>
+                        </div>
+                        <div className="p-6 text-center">
+                            <p className="text-gray-700 font-semibold mb-2">
+                                Periodo: {modalReabrir.mes}/{modalReabrir.anio}
+                            </p>
+                            <p className="text-gray-500 text-sm mb-6">
+                                ¿Está seguro de reabrir este periodo? Esto permitirá modificar saldos y movimientos contables. Esta acción quedará registrada en auditoría.
+                            </p>
+                            <div className="flex gap-3 justify-center">
+                                <button onClick={() => setModalReabrir({ visible: false, anio: null, mes: null })} className="px-5 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-all">Cancelar</button>
+                                <button onClick={handleReabrir} className="px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold transition-all">Sí, reabrir</button>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -22,7 +22,7 @@ function Polizas() {
     });
 
     const [detalles, setDetalles] = useState([
-        { CUENTA_ID: '', DEBE: '', HABER: '' }
+    { CUENTA_ID: '', DEBE: '', HABER: '', CUENTA_TEXTO: '', DROPDOWN_ABIERTO: false }
     ]);
 
     const [formEditar, setFormEditar] = useState({
@@ -64,7 +64,7 @@ function Polizas() {
     };
 
     const agregarLinea = () => {
-        setDetalles([...detalles, { CUENTA_ID: '', DEBE: '', HABER: '' }]);
+    setDetalles([...detalles, { CUENTA_ID: '', DEBE: '', HABER: '', CUENTA_TEXTO: '', DROPDOWN_ABIERTO: false }]);
     };
 
     const eliminarLinea = (index) => {
@@ -74,9 +74,14 @@ function Polizas() {
 
     const totalDebe = detalles.reduce((sum, d) => sum + (parseFloat(d.DEBE) || 0), 0);
     const totalHaber = detalles.reduce((sum, d) => sum + (parseFloat(d.HABER) || 0), 0);
-    const cuadrada = totalDebe === totalHaber && totalDebe > 0;
+    const tieneMinDosLineas = detalles.length >= 2;
+    const cuadrada = totalDebe === totalHaber && totalDebe > 0 && tieneMinDosLineas;
 
     const handleCrear = async () => {
+        if (detalles.length < 2) {
+            mostrarMensaje('La póliza debe tener al menos 2 líneas de detalle.', 'error');
+            return;
+        }
         if (!cuadrada) {
             mostrarMensaje('La póliza no cuadra. El total del Debe debe ser igual al total del Haber.', 'error');
             return;
@@ -183,12 +188,64 @@ function Polizas() {
                                 <div key={index} className="grid grid-cols-12 gap-3 items-end">
                                     <div className="col-span-6">
                                         {index === 0 && <label className={labelClass}>Cuenta</label>}
-                                        <select name="CUENTA_ID" value={detalle.CUENTA_ID} onChange={(e) => handleChangeDetalle(index, e)} className={inputClass}>
-                                            <option value="">-- Seleccionar cuenta --</option>
-                                            {cuentas.map((c) => (
-                                                <option key={c.CUENTA_ID} value={c.CUENTA_ID}>{c.CUENTA_ID} — {c.NOMBRE}</option>
-                                            ))}
-                                        </select>
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                placeholder="Buscar cuenta..."
+                                                value={detalle.CUENTA_TEXTO || ''}
+                                                onChange={(e) => {
+                                                const nuevosDetalles = [...detalles];
+                                                nuevosDetalles[index].CUENTA_TEXTO = e.target.value;
+                                                nuevosDetalles[index].CUENTA_ID = '';
+                                                setDetalles(nuevosDetalles);
+                                            }}
+                                            onFocus={() => {
+                                                const nuevosDetalles = [...detalles];
+                                                nuevosDetalles[index].DROPDOWN_ABIERTO = true;
+                                                setDetalles(nuevosDetalles);
+                                            }}
+                                            onBlur={() => {
+                                                setTimeout(() => {
+                                                const nuevosDetalles = [...detalles];
+                                                nuevosDetalles[index].DROPDOWN_ABIERTO = false;
+                                                setDetalles(nuevosDetalles);
+                                            }, 200);
+                                        }}
+                                        className={inputClass}
+                                    />
+                                    {detalle.DROPDOWN_ABIERTO && (
+                                        <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto">
+                                            {cuentas
+                                                .filter(c =>
+                                                    `${c.CUENTA_ID} ${c.NOMBRE}`.toLowerCase()
+                                                    .includes((detalle.CUENTA_TEXTO || '').toLowerCase())
+                                                )
+                                                .slice(0, 20)
+                                                .map(c => (
+                                                    <div
+                                                        key={c.CUENTA_ID}
+                                                        onMouseDown={() => {
+                                                            const nuevosDetalles = [...detalles];
+                                                            nuevosDetalles[index].CUENTA_ID = c.CUENTA_ID;
+                                                            nuevosDetalles[index].CUENTA_TEXTO = `${c.CUENTA_ID} — ${c.NOMBRE}`;
+                                                            nuevosDetalles[index].DROPDOWN_ABIERTO = false;
+                                                            setDetalles(nuevosDetalles);
+                                                        }}
+                                                        className="px-3 py-2 text-sm text-gray-700 hover:bg-[#1E3A5F] hover:text-white cursor-pointer"
+                                                    >
+                                                        {c.CUENTA_ID} — {c.NOMBRE}
+                                                    </div>
+                                                ))
+                                            }
+                                            {cuentas.filter(c =>
+                                                `${c.CUENTA_ID} ${c.NOMBRE}`.toLowerCase()
+                                                .includes((detalle.CUENTA_TEXTO || '').toLowerCase())
+                                            ).length === 0 && (
+                                                <div className="px-3 py-2 text-sm text-gray-400 italic">Sin resultados</div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                                     </div>
                                     <div className="col-span-2">
                                         {index === 0 && <label className={labelClass}>Debe</label>}
@@ -229,6 +286,8 @@ function Polizas() {
                             <div>
                                 {cuadrada ? (
                                     <span className="px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-700">✅ Póliza cuadrada</span>
+                                ) : !tieneMinDosLineas && (totalDebe > 0 || totalHaber > 0) ? (
+                                    <span className="px-3 py-1 rounded-full text-sm font-semibold bg-yellow-100 text-yellow-700">⚠️ Mínimo 2 líneas requeridas</span>
                                 ) : totalDebe > 0 || totalHaber > 0 ? (
                                     <span className="px-3 py-1 rounded-full text-sm font-semibold bg-red-100 text-red-700">❌ Póliza descuadrada</span>
                                 ) : null}
