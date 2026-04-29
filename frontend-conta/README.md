@@ -1,16 +1,24 @@
-# React + Vite
+# 📊 Sistema Contable Integral (Full Stack)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Este es un sistema contable desarrollado como proyecto académico para la Universidad Mariano Gálvez. La plataforma permite la gestión financiera, control de roles y administración de datos contables de forma eficiente.
 
-Currently, two official plugins are available:
+## 🛠️ Tecnologías Utilizadas
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+*   **Frontend:** React.js
+*   **Backend:** Node.js & Express
+*   **Base de Datos:** MySQL (Hosting en Oracle Cloud)
+*   **Metodología:** Scrum (Rol: Desarrollador Principal)
 
-## React Compiler
+## 🚀 Funcionalidades Principales
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+*   Autenticación de usuarios y gestión de roles.
+*   Módulo de registro y consulta de movimientos contables.
+*   Generación de reportes dinámicos.
+*   Arquitectura escalable conectada a base de datos relacional.
 
-## Expanding the ESLint configuration
+## 📦 Instalación (Desarrollo local)
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+1. Clona el repositorio.
+2. Ejecuta `npm install` tanto en la carpeta de frontend como de backend.
+3. **Importante:** Crea un archivo `.env` en la raíz del backend con tus credenciales de base de datos (ver `.env.example`).
+4. Inicia el servidor con `npm start`.
