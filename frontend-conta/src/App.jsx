@@ -59,18 +59,26 @@ function Home() {
                 <p className="text-gray-500 text-sm mb-8">Selecciona un módulo para comenzar</p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {modulos.map((mod) => (
-                        <button
-                            key={mod.path}
-                            onClick={() => navigate(mod.path)}
-                            className="bg-white border border-gray-200 rounded-xl p-8 text-left shadow-sm hover:shadow-lg hover:border-[#1E3A5F] hover:bg-[#f0f4fa] hover:scale-105 transition-all duration-200 group flex items-center gap-4"
-                        >
-                            <span className="text-3xl">{mod.icon}</span>
-                            <span className="text-[#1E3A5F] font-semibold text-base group-hover:text-[#1E3A5F]">
-                                {mod.label}
-                            </span>
-                        </button>
-                    ))}
+                    {modulos
+                        .filter((mod) => {
+                            // Si el módulo es de Usuarios o Logs, exige estrictamente el rol ADMIN
+                            if (mod.path === '/usuarios' || mod.path === '/logs') {
+                                return usuario?.ROL === 'ADMIN';
+                            }
+                            return true; // Los demás módulos quedan visibles para todos
+                        })
+                        .map((mod) => (
+                            <button
+                                key={mod.path}
+                                onClick={() => navigate(mod.path)}
+                                className="bg-white border border-gray-200 rounded-xl p-8 text-left shadow-sm hover:shadow-lg hover:border-[#1E3A5F] hover:bg-[#f0f4fa] hover:scale-105 transition-all duration-200 group flex items-center gap-4"
+                            >
+                                <span className="text-3xl">{mod.icon}</span>
+                                <span className="text-[#1E3A5F] font-semibold text-base group-hover:text-[#1E3A5F]">
+                                    {mod.label}
+                                </span>
+                            </button>
+                        ))}
                 </div>
             </main>
 
@@ -86,15 +94,22 @@ function App() {
         <BrowserRouter>
             <Routes>
                 <Route path="/login" element={<Login />} />
-                <Route path="/polizas" element={<RutaProtegida><Polizas /></RutaProtegida>} />
                 <Route path="/" element={<RutaProtegida><Home /></RutaProtegida>} />
+                <Route path="/polizas" element={<RutaProtegida><Polizas /></RutaProtegida>} />
                 <Route path="/cuentas" element={<RutaProtegida><CatalogoCuentas /></RutaProtegida>} />
                 <Route path="/periodos" element={<RutaProtegida><Periodos /></RutaProtegida>} />
                 <Route path="/reportes" element={<RutaProtegida><Reportes /></RutaProtegida>} />
                 <Route path="/configuracion-reportes" element={<RutaProtegida><ConfiguracionReportes /></RutaProtegida>} />
                 <Route path="/hoja-trabajo" element={<RutaProtegida><HojaTrabajoSaldos /></RutaProtegida>} />
-                <Route path="/usuarios" element={<RutaProtegida><UsuariosContables /></RutaProtegida>} />
-                <Route path="/logs" element={<RutaProtegida><LogsAuditoria /></RutaProtegida>} />
+                
+                {/* Módulos críticos restringidos únicamente a administradores */}
+                <Route path="/usuarios" element={
+                    <RutaProtegida rolesPermitidos={['ADMIN']}><UsuariosContables /></RutaProtegida>
+                } />
+                <Route path="/logs" element={
+                    <RutaProtegida rolesPermitidos={['ADMIN']}><LogsAuditoria /></RutaProtegida>
+                } />
+                
                 <Route path="*" element={<Navigate to="/login" />} />
             </Routes>
         </BrowserRouter>

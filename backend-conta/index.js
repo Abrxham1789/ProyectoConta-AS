@@ -9,7 +9,7 @@ console.log("Ruta Oracle:", process.env.ORACLE_LIB_DIR);
 console.log("----------------------------");
 
 const { getConnection, initialize } = require('./database');
-
+const oracledb = require('oracledb');
 // importar rutas
 const reportesRoutes = require('./routes/reportes');
 const cuentasRoutes = require('./routes/catalogo_cuentas');
@@ -44,38 +44,44 @@ app.get('/', (req, res) => {
 });
 
 // Prueba de conexión a Oracle
+// Prueba de conexión modificada para auditar tu tabla de usuarios en Oracle Cloud
 app.get('/test-db', async (req, res) => {
   let connection;
   try {
     connection = await getConnection();
-    const result = await connection.execute('SELECT SYSDATE FROM DUAL');
-    res.json({ message: "Conectado a Oracle Cloud (vía Pool)", fecha: result.rows[0] });
+    // Le pedimos a Oracle que nos muestre cómo están guardadas las credenciales de admin
+    const result = await connection.execute(
+      `SELECT USERNAME, PASSWORD_HASH, ROL FROM USUARIOS_CONTABLES WHERE USERNAME = 'admin'`,
+      [],
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+    res.json({ 
+      message: "Auditoría de credenciales en Oracle Cloud", 
+      registroEncontrado: result.rows 
+    });
   } catch (err) {
     console.error("Error en /test-db:", err);
     res.status(500).json({ error: err.message });
   } finally {
     if (connection) {
-      try {
-        await connection.close(); // Siempre cerrar para devolver la conexión al pool
-      } catch (closeErr) {
-        console.error("Error al cerrar conexión:", closeErr);
-      }
+      try { await connection.close(); } catch (closeErr) { console.error(closeErr); }
     }
   }
 });
+
 
 // NUEVA FORMA DE ARRANCAR: 
 // Primero inicializamos el Pool, luego levantamos el servidor.
 async function startServer() {
   try {
     await initialize(); // Llama a la función de database.js
-    
+
     app.listen(PORT, () => {
       console.log(`Servidor corriendo en http://localhost:${PORT}`);
     });
   } catch (err) {
     console.error("No se pudo iniciar el servidor debido a un error en el Pool:", err);
-    process.exit(1); // Detiene todo si no hay base de datos
+    process.exit(1);
   }
 }
 
@@ -93,4 +99,5 @@ setInterval(async () => {
 }, 240000);
 
 startServer();
+
 

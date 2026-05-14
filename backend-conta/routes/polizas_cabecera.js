@@ -2,27 +2,19 @@ const express = require('express');
 const router = express.Router();
 const { getConnection } = require('../database');
 const oracledb = require('oracledb');
+const verificarToken = require('../middlewares/auth');
 
 // CREATE - crear póliza cabecera
-router.post('/polizas-cabecera', async (req, res) => {
+router.post('/polizas-cabecera', verificarToken, async (req, res) => {
     let connection;
     try {
         const { ANIO, MES, NUM_POLIZA, FECHA, TIPO_POLIZA, ESTADO, SINOPSIS } = req.body;
-
         connection = await getConnection();
 
         await connection.execute(
             `INSERT INTO POLIZAS_CABECERA (ANIO, MES, NUM_POLIZA, FECHA, TIPO_POLIZA, ESTADO, SINOPSIS)
             VALUES (:ANIO, :MES, :NUM_POLIZA, TO_DATE(:FECHA, 'YYYY-MM-DD'), :TIPO_POLIZA, :ESTADO, :SINOPSIS)`,
-            {
-                ANIO,
-                MES,
-                NUM_POLIZA,
-                FECHA: FECHA || null,
-                TIPO_POLIZA,
-                ESTADO: ESTADO || 'BORRADOR',
-                SINOPSIS: SINOPSIS || null
-            },
+            { ANIO, MES, NUM_POLIZA, FECHA: FECHA || null, TIPO_POLIZA, ESTADO: ESTADO || 'BORRADOR', SINOPSIS: SINOPSIS || null },
             { autoCommit: true }
         );
 
@@ -30,24 +22,25 @@ router.post('/polizas-cabecera', async (req, res) => {
             `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
             VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
             {
-            USER_ID: req.body.LOGGED_USER_ID || null,
-            ACCION: 'INSERT',
-            TABLA_AFECTADA: 'POLIZAS_CABECERA',
-            REGISTRO_ID: null
+                USER_ID: req.usuario?.ID || null,
+                ACCION: 'INSERT',
+                TABLA_AFECTADA: 'POLIZAS_CABECERA',
+                REGISTRO_ID: `${ANIO}-${MES}-${NUM_POLIZA}`
             },
             { autoCommit: true }
         );
 
         res.json({ message: "Póliza cabecera creada correctamente" });
     } catch (err) {
-        res.status(500).send(err.message);
+        console.error(err);
+        res.status(500).json({ message: "Error interno al crear la cabecera de la póliza" });
     } finally {
         if (connection) await connection.close();
     }
 });
 
 // READ - obtener todas las pólizas cabecera
-router.get('/polizas-cabecera', async (req, res) => {
+router.get('/polizas-cabecera', verificarToken, async (req, res) => {
     let connection;
     try {
         connection = await getConnection();
@@ -60,18 +53,18 @@ router.get('/polizas-cabecera', async (req, res) => {
 
         res.json(result.rows);
     } catch (err) {
-        res.status(500).send(err.message);
+        console.error(err);
+        res.status(500).json({ message: "Error al obtener el listado de pólizas" });
     } finally {
         if (connection) await connection.close();
     }
 });
 
 // READ - obtener una póliza por ID
-router.get('/polizas-cabecera/:id', async (req, res) => {
+router.get('/polizas-cabecera/:id', verificarToken, async (req, res) => {
     let connection;
     try {
         const id = req.params.id;
-
         connection = await getConnection();
 
         const result = await connection.execute(
@@ -84,32 +77,27 @@ router.get('/polizas-cabecera/:id', async (req, res) => {
             return res.status(404).json({ message: "Póliza no encontrada" });
         }
 
-        res.json(result.rows[0]);
+        res.json(result.rows);
     } catch (err) {
-        res.status(500).send(err.message);
+        console.error(err);
+        res.status(500).json({ message: "Error al buscar la póliza especificada" });
     } finally {
         if (connection) await connection.close();
     }
 });
 
 // UPDATE - actualizar póliza cabecera
-router.put('/polizas-cabecera/:id', async (req, res) => {
+router.put('/polizas-cabecera/:id', verificarToken, async (req, res) => {
     let connection;
     try {
         const id = req.params.id;
         const { ANIO, MES, NUM_POLIZA, FECHA, TIPO_POLIZA, ESTADO, SINOPSIS } = req.body;
-
         connection = await getConnection();
 
         await connection.execute(
             `UPDATE POLIZAS_CABECERA
-            SET ANIO = :ANIO,
-            MES = :MES,
-            NUM_POLIZA = :NUM_POLIZA,
-            FECHA = TO_DATE(:FECHA, 'YYYY-MM-DD'),
-            TIPO_POLIZA = :TIPO_POLIZA,
-            ESTADO = :ESTADO,
-            SINOPSIS = :SINOPSIS
+            SET ANIO = :ANIO, MES = :MES, NUM_POLIZA = :NUM_POLIZA, FECHA = TO_DATE(:FECHA, 'YYYY-MM-DD'),
+                TIPO_POLIZA = :TIPO_POLIZA, ESTADO = :ESTADO, SINOPSIS = :SINOPSIS
             WHERE POLIZA_ID = :id`,
             { ANIO, MES, NUM_POLIZA, FECHA: FECHA || null, TIPO_POLIZA, ESTADO, SINOPSIS: SINOPSIS || null, id },
             { autoCommit: true }
@@ -119,28 +107,28 @@ router.put('/polizas-cabecera/:id', async (req, res) => {
             `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
             VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
             {
-            USER_ID: req.body.LOGGED_USER_ID || null,
-            ACCION: 'UPDATE',
-            TABLA_AFECTADA: 'POLIZAS_CABECERA',
-            REGISTRO_ID: null
+                USER_ID: req.usuario?.ID || null,
+                ACCION: 'UPDATE',
+                TABLA_AFECTADA: 'POLIZAS_CABECERA',
+                REGISTRO_ID: id
             },
             { autoCommit: true }
         );
 
         res.json({ message: "Póliza actualizada correctamente" });
     } catch (err) {
-        res.status(500).send(err.message);
+        console.error(err);
+        res.status(500).json({ message: "Error al actualizar la cabecera de la póliza" });
     } finally {
         if (connection) await connection.close();
     }
 });
 
 // DELETE - eliminar póliza cabecera
-router.delete('/polizas-cabecera/:id', async (req, res) => {
+router.delete('/polizas-cabecera/:id', verificarToken, async (req, res) => {
     let connection;
     try {
         const id = req.params.id;
-
         connection = await getConnection();
 
         await connection.execute(
@@ -153,45 +141,42 @@ router.delete('/polizas-cabecera/:id', async (req, res) => {
             `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
             VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
             {
-            USER_ID: req.body.LOGGED_USER_ID || null,
-            ACCION: 'DELETE',
-            TABLA_AFECTADA: 'POLIZAS_CABECERA',
-            REGISTRO_ID: null
+                USER_ID: req.usuario?.ID || null,
+                ACCION: 'DELETE',
+                TABLA_AFECTADA: 'POLIZAS_CABECERA',
+                REGISTRO_ID: id
             },
             { autoCommit: true }
         );
 
         res.json({ message: "Póliza eliminada correctamente" });
     } catch (err) {
-        res.status(500).send(err.message);
+        console.error(err);
+        res.status(500).json({ message: "Error al eliminar la póliza" });
     } finally {
         if (connection) await connection.close();
     }
 });
 
-// CREATE UNIFICADO - crear poliza con detalles
-router.post('/polizas-unificado', async (req, res) => {
+// CREATE UNIFICADO - crear poliza con detalles (Uso transaccional avanzado)
+router.post('/polizas-unificado', verificarToken, async (req, res) => {
     let connection;
     try {
-        const { ANIO, MES, NUM_POLIZA, FECHA, TIPO_POLIZA, ESTADO, SINOPSIS, DETALLES, LOGGED_USER_ID } = req.body;
+        const { ANIO, MES, NUM_POLIZA, FECHA, TIPO_POLIZA, ESTADO, SINOPSIS, DETALLES } = req.body;
 
-        // Validación: partida doble requiere mínimo 2 líneas de detalle
         if (!DETALLES || DETALLES.length < 2) {
             return res.status(400).json({ message: "La póliza debe contener al menos 2 líneas de detalle (partida doble)." });
         }
 
         connection = await getConnection();
 
-        // 1. Insertar cabecera y obtener el POLIZA_ID generado
         const resultCabecera = await connection.execute(
             `INSERT INTO POLIZAS_CABECERA (ANIO, MES, NUM_POLIZA, FECHA, TIPO_POLIZA, ESTADO, SINOPSIS)
             VALUES (:ANIO, :MES, :NUM_POLIZA, TO_DATE(:FECHA, 'YYYY-MM-DD'), :TIPO_POLIZA, :ESTADO, :SINOPSIS)
             RETURNING POLIZA_ID INTO :POLIZA_ID`,
             {
-                ANIO, MES, NUM_POLIZA,
-                FECHA: FECHA || null,
-                TIPO_POLIZA, ESTADO: ESTADO || 'BORRADOR',
-                SINOPSIS: SINOPSIS || null,
+                ANIO, MES, NUM_POLIZA, FECHA: FECHA || null,
+                TIPO_POLIZA, ESTADO: ESTADO || 'BORRADOR', SINOPSIS: SINOPSIS || null,
                 POLIZA_ID: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER }
             },
             { autoCommit: false }
@@ -199,27 +184,20 @@ router.post('/polizas-unificado', async (req, res) => {
 
         const polizaId = resultCabecera.outBinds.POLIZA_ID[0];
 
-        // 2. Insertar cada detalle con el POLIZA_ID obtenido
         for (const detalle of DETALLES) {
             await connection.execute(
                 `INSERT INTO POLIZAS_DETALLE (POLIZA_ID, CUENTA_ID, DEBE, HABER)
                 VALUES (:POLIZA_ID, :CUENTA_ID, :DEBE, :HABER)`,
-                {
-                    POLIZA_ID: polizaId,
-                    CUENTA_ID: detalle.CUENTA_ID,
-                    DEBE: detalle.DEBE || 0,
-                    HABER: detalle.HABER || 0
-                },
+                { polizaId, CUENTA_ID: detalle.CUENTA_ID, DEBE: detalle.DEBE || 0, HABER: detalle.HABER || 0 },
                 { autoCommit: false }
             );
         }
 
-        // 3. Registrar log
         await connection.execute(
             `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
             VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
             {
-                USER_ID: LOGGED_USER_ID || null,
+                USER_ID: req.usuario?.ID || null,
                 ACCION: 'INSERT',
                 TABLA_AFECTADA: 'POLIZAS_CABECERA',
                 REGISTRO_ID: polizaId
@@ -227,14 +205,13 @@ router.post('/polizas-unificado', async (req, res) => {
             { autoCommit: false }
         );
 
-        // 4. Confirmar toda la transaccion
         await connection.commit();
-
         res.json({ message: "Póliza creada correctamente", POLIZA_ID: polizaId });
 
     } catch (err) {
         if (connection) await connection.rollback();
-        res.status(500).send(err.message);
+        console.error(err);
+        res.status(500).json({ message: "Error interno en la transacción. Póliza no procesada." });
     } finally {
         if (connection) await connection.close();
     }

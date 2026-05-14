@@ -2,13 +2,13 @@ const express = require('express');
 const router = express.Router();
 const { getConnection } = require('../database');
 const oracledb = require('oracledb');
+const verificarToken = require('../middlewares/auth');
 
 // CREATE - crear periodo de cierre
-router.post('/periodos', async (req, res) => {
+router.post('/periodos', verificarToken, async (req, res) => {
     let connection;
     try {
         const { ANIO, MES, ESTADO_CIERRE, FECHA_CIERRE } = req.body;
-
         connection = await getConnection();
 
         await connection.execute(
@@ -18,28 +18,30 @@ router.post('/periodos', async (req, res) => {
             { autoCommit: true }
         );
 
+        // Registro detallado en auditoría usando clave compuesta concatenada
         await connection.execute(
             `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
             VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
             {
-            USER_ID: req.body.LOGGED_USER_ID || null,
-            ACCION: 'INSERT',
-            TABLA_AFECTADA: 'PERIODOS_CIERRE',
-            REGISTRO_ID: null
+                USER_ID: req.usuario?.ID || null,
+                ACCION: 'INSERT',
+                TABLA_AFECTADA: 'PERIODOS_CIERRE',
+                REGISTRO_ID: `${ANIO}-${MES}`
             },
             { autoCommit: true }
         );
 
         res.json({ message: "Periodo de cierre creado correctamente" });
     } catch (err) {
-        res.status(500).send(err.message);
+        console.error(err);
+        res.status(500).json({ message: "Error interno al crear el periodo de cierre" });
     } finally {
         if (connection) await connection.close();
     }
 });
 
 // READ - obtener todos los periodos
-router.get('/periodos', async (req, res) => {
+router.get('/periodos', verificarToken, async (req, res) => {
     let connection;
     try {
         connection = await getConnection();
@@ -52,18 +54,18 @@ router.get('/periodos', async (req, res) => {
 
         res.json(result.rows);
     } catch (err) {
-        res.status(500).send(err.message);
+        console.error(err);
+        res.status(500).json({ message: "Error al obtener el listado de periodos" });
     } finally {
         if (connection) await connection.close();
     }
 });
 
 // READ - obtener un periodo por ANIO y MES
-router.get('/periodos/:anio/:mes', async (req, res) => {
+router.get('/periodos/:anio/:mes', verificarToken, async (req, res) => {
     let connection;
     try {
         const { anio, mes } = req.params;
-
         connection = await getConnection();
 
         const result = await connection.execute(
@@ -78,19 +80,19 @@ router.get('/periodos/:anio/:mes', async (req, res) => {
 
         res.json(result.rows[0]);
     } catch (err) {
-        res.status(500).send(err.message);
+        console.error(err);
+        res.status(500).json({ message: "Error al buscar el periodo solicitado" });
     } finally {
         if (connection) await connection.close();
     }
 });
 
 // UPDATE - actualizar periodo
-router.put('/periodos/:anio/:mes', async (req, res) => {
+router.put('/periodos/:anio/:mes', verificarToken, async (req, res) => {
     let connection;
     try {
         const { anio, mes } = req.params;
         const { ESTADO_CIERRE, FECHA_CIERRE } = req.body;
-
         connection = await getConnection();
 
         await connection.execute(
@@ -106,28 +108,28 @@ router.put('/periodos/:anio/:mes', async (req, res) => {
             `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
             VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
             {
-            USER_ID: req.body.LOGGED_USER_ID || null,
-            ACCION: 'UPDATE',
-            TABLA_AFECTADA: 'PERIODOS_CIERRE',
-            REGISTRO_ID: null
+                USER_ID: req.usuario?.ID || null,
+                ACCION: 'UPDATE',
+                TABLA_AFECTADA: 'PERIODOS_CIERRE',
+                REGISTRO_ID: `${anio}-${mes}`
             },
             { autoCommit: true }
         );
 
         res.json({ message: "Periodo actualizado correctamente" });
     } catch (err) {
-        res.status(500).send(err.message);
+        console.error(err);
+        res.status(500).json({ message: "Error al actualizar el periodo contable" });
     } finally {
         if (connection) await connection.close();
     }
 });
 
 // DELETE - eliminar periodo
-router.delete('/periodos/:anio/:mes', async (req, res) => {
+router.delete('/periodos/:anio/:mes', verificarToken, async (req, res) => {
     let connection;
     try {
         const { anio, mes } = req.params;
-
         connection = await getConnection();
 
         await connection.execute(
@@ -140,17 +142,18 @@ router.delete('/periodos/:anio/:mes', async (req, res) => {
             `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
             VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
             {
-            USER_ID: req.body.LOGGED_USER_ID || null,
-            ACCION: 'DELETE',
-            TABLA_AFECTADA: 'PERIODOS_CIERRE',
-            REGISTRO_ID: null
+                USER_ID: req.usuario?.ID || null,
+                ACCION: 'DELETE',
+                TABLA_AFECTADA: 'PERIODOS_CIERRE',
+                REGISTRO_ID: `${anio}-${mes}`
             },
             { autoCommit: true }
         );
 
         res.json({ message: "Periodo eliminado correctamente" });
     } catch (err) {
-        res.status(500).send(err.message);
+        console.error(err);
+        res.status(500).json({ message: "Error al eliminar el periodo contable" });
     } finally {
         if (connection) await connection.close();
     }

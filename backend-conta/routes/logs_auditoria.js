@@ -2,13 +2,21 @@ const express = require('express');
 const router = express.Router();
 const { getConnection } = require('../database');
 const oracledb = require('oracledb');
+const verificarToken = require('../middlewares/auth');
 
-// CREATE - registrar log
-router.post('/logs', async (req, res) => {
+// Middleware interno para restringir accesos exclusivamente a administradores
+const exigirAdmin = (req, res, next) => {
+    if (req.usuario?.ROL !== 'ADMIN') {
+        return res.status(403).json({ message: "Acceso denegado. Se requieren privilegios de administrador." });
+    }
+    next();
+};
+
+// CREATE - registrar log (Disponible para el sistema interno)
+router.post('/logs', verificarToken, async (req, res) => {
     let connection;
     try {
         const { USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID } = req.body;
-
         connection = await getConnection();
 
         await connection.execute(
@@ -18,28 +26,17 @@ router.post('/logs', async (req, res) => {
             { autoCommit: true }
         );
 
-        await connection.execute(
-            `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
-            VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
-            {
-            USER_ID: req.body.LOGGED_USER_ID || null,
-            ACCION: 'INSERT',
-            TABLA_AFECTADA: 'LOGS_AUDITORIA',
-            REGISTRO_ID: null
-            },
-            { autoCommit: true }
-        );
-
         res.json({ message: "Log registrado correctamente" });
     } catch (err) {
-        res.status(500).send(err.message);
+        console.error(err);
+        res.status(500).json({ message: "Error interno al registrar la bitácora" });
     } finally {
         if (connection) await connection.close();
     }
 });
 
-// READ - obtener todos los logs
-router.get('/logs', async (req, res) => {
+// READ - obtener todos los logs (Solo ADMIN)
+router.get('/logs', verificarToken, exigirAdmin, async (req, res) => {
     let connection;
     try {
         connection = await getConnection();
@@ -55,18 +52,18 @@ router.get('/logs', async (req, res) => {
 
         res.json(result.rows);
     } catch (err) {
-        res.status(500).send(err.message);
+        console.error(err);
+        res.status(500).json({ message: "Error al obtener el historial de logs" });
     } finally {
         if (connection) await connection.close();
     }
 });
 
-// READ - obtener log por ID
-router.get('/logs/:id', async (req, res) => {
+// READ - obtener log por ID (Solo ADMIN)
+router.get('/logs/:id', verificarToken, exigirAdmin, async (req, res) => {
     let connection;
     try {
         const id = req.params.id;
-
         connection = await getConnection();
 
         const result = await connection.execute(
@@ -82,20 +79,20 @@ router.get('/logs/:id', async (req, res) => {
             return res.status(404).json({ message: "Log no encontrado" });
         }
 
-        res.json(result.rows[0]);
+        res.json(result.rows);
     } catch (err) {
-        res.status(500).send(err.message);
+        console.error(err);
+        res.status(500).json({ message: "Error al buscar el registro de log" });
     } finally {
         if (connection) await connection.close();
     }
 });
 
-// READ - obtener logs por usuario
-router.get('/logs/usuario/:userId', async (req, res) => {
+// READ - obtener logs por usuario (Solo ADMIN)
+router.get('/logs/usuario/:userId', verificarToken, exigirAdmin, async (req, res) => {
     let connection;
     try {
         const userId = req.params.userId;
-
         connection = await getConnection();
 
         const result = await connection.execute(
@@ -110,81 +107,8 @@ router.get('/logs/usuario/:userId', async (req, res) => {
 
         res.json(result.rows);
     } catch (err) {
-        res.status(500).send(err.message);
-    } finally {
-        if (connection) await connection.close();
-    }
-});
-
-// UPDATE - actualizar log
-router.put('/logs/:id', async (req, res) => {
-    let connection;
-    try {
-        const id = req.params.id;
-        const { USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID } = req.body;
-
-        connection = await getConnection();
-
-        await connection.execute(
-            `UPDATE LOGS_AUDITORIA
-            SET USER_ID = :USER_ID,
-            ACCION = :ACCION,
-            TABLA_AFECTADA = :TABLA_AFECTADA,
-            REGISTRO_ID = :REGISTRO_ID
-            WHERE LOG_ID = :id`,
-            { USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID: REGISTRO_ID || null, id },
-            { autoCommit: true }
-        );
-
-        await connection.execute(
-            `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
-            VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
-            {
-            USER_ID: req.body.LOGGED_USER_ID || null,
-            ACCION: 'UPDATE',
-            TABLA_AFECTADA: 'LOGS_AUDITORIA',
-            REGISTRO_ID: null
-            },
-            { autoCommit: true }
-        );
-
-        res.json({ message: "Log actualizado correctamente" });
-    } catch (err) {
-        res.status(500).send(err.message);
-    } finally {
-        if (connection) await connection.close();
-    }
-});
-
-// DELETE - eliminar log
-router.delete('/logs/:id', async (req, res) => {
-    let connection;
-    try {
-        const id = req.params.id;
-
-        connection = await getConnection();
-
-        await connection.execute(
-            `DELETE FROM LOGS_AUDITORIA WHERE LOG_ID = :id`,
-            { id },
-            { autoCommit: true }
-        );
-
-        await connection.execute(
-            `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
-            VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
-            {
-            USER_ID: req.body.LOGGED_USER_ID || null,
-            ACCION: 'DELETE',
-            TABLA_AFECTADA: 'LOGS_AUDITORIA',
-            REGISTRO_ID: null
-            },
-            { autoCommit: true }
-        );
-
-        res.json({ message: "Log eliminado correctamente" });
-    } catch (err) {
-        res.status(500).send(err.message);
+        console.error(err);
+        res.status(500).json({ message: "Error al filtrar logs por usuario" });
     } finally {
         if (connection) await connection.close();
     }

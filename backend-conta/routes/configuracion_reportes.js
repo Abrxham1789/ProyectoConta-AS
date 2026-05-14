@@ -2,13 +2,13 @@ const express = require('express');
 const router = express.Router();
 const { getConnection } = require('../database');
 const oracledb = require('oracledb');
+const verificarToken = require('../middlewares/auth');
 
 // CREATE - crear configuración de reporte
-router.post('/configuracion-reportes', async (req, res) => {
+router.post('/configuracion-reportes', verificarToken, async (req, res) => {
     let connection;
     try {
         const { CONFIG_ID, NOMBRE_REPORTE, SECCION, CUENTA_ID, ORDEN, OPERACION } = req.body;
-
         connection = await getConnection();
 
         await connection.execute(
@@ -18,16 +18,30 @@ router.post('/configuracion-reportes', async (req, res) => {
             { autoCommit: true }
         );
 
+        // Se agregó la auditoría que faltaba en este endpoint
+        await connection.execute(
+            `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
+            VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
+            {
+                USER_ID: req.usuario?.ID || null,
+                ACCION: 'INSERT',
+                TABLA_AFECTADA: 'CONFIGURACION_REPORTES',
+                REGISTRO_ID: CONFIG_ID || null
+            },
+            { autoCommit: true }
+        );
+
         res.json({ message: "Configuración de reporte creada correctamente" });
     } catch (err) {
-        res.status(500).send(err.message);
+        console.error(err);
+        res.status(500).json({ message: "Error interno al crear la configuración de reporte" });
     } finally {
         if (connection) await connection.close();
     }
 });
 
 // READ - obtener todas las configuraciones
-router.get('/configuracion-reportes', async (req, res) => {
+router.get('/configuracion-reportes', verificarToken, async (req, res) => {
     let connection;
     try {
         connection = await getConnection();
@@ -40,18 +54,18 @@ router.get('/configuracion-reportes', async (req, res) => {
 
         res.json(result.rows);
     } catch (err) {
-        res.status(500).send(err.message);
+        console.error(err);
+        res.status(500).json({ message: "Error al obtener las configuraciones" });
     } finally {
         if (connection) await connection.close();
     }
 });
 
 // READ - obtener configuración por ID
-router.get('/configuracion-reportes/:id', async (req, res) => {
+router.get('/configuracion-reportes/:id', verificarToken, async (req, res) => {
     let connection;
     try {
         const id = req.params.id;
-
         connection = await getConnection();
 
         const result = await connection.execute(
@@ -66,28 +80,24 @@ router.get('/configuracion-reportes/:id', async (req, res) => {
 
         res.json(result.rows[0]);
     } catch (err) {
-        res.status(500).send(err.message);
+        console.error(err);
+        res.status(500).json({ message: "Error al buscar la configuración" });
     } finally {
         if (connection) await connection.close();
     }
 });
 
 // UPDATE - actualizar configuración
-router.put('/configuracion-reportes/:id', async (req, res) => {
+router.put('/configuracion-reportes/:id', verificarToken, async (req, res) => {
     let connection;
     try {
         const id = req.params.id;
         const { NOMBRE_REPORTE, SECCION, CUENTA_ID, ORDEN, OPERACION } = req.body;
-
         connection = await getConnection();
 
         await connection.execute(
             `UPDATE CONFIGURACION_REPORTES
-            SET NOMBRE_REPORTE = :NOMBRE_REPORTE,
-            SECCION = :SECCION,
-            CUENTA_ID = :CUENTA_ID,
-            ORDEN = :ORDEN,
-            OPERACION = :OPERACION
+            SET NOMBRE_REPORTE = :NOMBRE_REPORTE, SECCION = :SECCION, CUENTA_ID = :CUENTA_ID, ORDEN = :ORDEN, OPERACION = :OPERACION
             WHERE CONFIG_ID = :id`,
             { NOMBRE_REPORTE, SECCION, CUENTA_ID, ORDEN, OPERACION, id },
             { autoCommit: true }
@@ -97,28 +107,28 @@ router.put('/configuracion-reportes/:id', async (req, res) => {
             `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
             VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
             {
-            USER_ID: req.body.LOGGED_USER_ID || null,
-            ACCION: 'UPDATE',
-            TABLA_AFECTADA: 'CONFIGURACION_REPORTES',
-            REGISTRO_ID: req.body.CONFIG_ID || null
+                USER_ID: req.usuario?.ID || null,
+                ACCION: 'UPDATE',
+                TABLA_AFECTADA: 'CONFIGURACION_REPORTES',
+                REGISTRO_ID: id || null
             },
             { autoCommit: true }
         );
 
         res.json({ message: "Configuración actualizada correctamente" });
     } catch (err) {
-        res.status(500).send(err.message);
+        console.error(err);
+        res.status(500).json({ message: "Error al actualizar la configuración" });
     } finally {
         if (connection) await connection.close();
     }
 });
 
 // DELETE - eliminar configuración
-router.delete('/configuracion-reportes/:id', async (req, res) => {
+router.delete('/configuracion-reportes/:id', verificarToken, async (req, res) => {
     let connection;
     try {
         const id = req.params.id;
-
         connection = await getConnection();
 
         await connection.execute(
@@ -131,17 +141,18 @@ router.delete('/configuracion-reportes/:id', async (req, res) => {
             `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
             VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
             {
-            USER_ID: req.body.LOGGED_USER_ID || null,
-            ACCION: 'DELETE',
-            TABLA_AFECTADA: 'CONFIGURACION_REPORTES',
-            REGISTRO_ID: req.body.CONFIG_ID || null
+                USER_ID: req.usuario?.ID || null,
+                ACCION: 'DELETE',
+                TABLA_AFECTADA: 'CONFIGURACION_REPORTES',
+                REGISTRO_ID: id || null
             },
             { autoCommit: true }
         );
 
         res.json({ message: "Configuración eliminada correctamente" });
     } catch (err) {
-        res.status(500).send(err.message);
+        console.error(err);
+        res.status(500).json({ message: "Error al eliminar la configuración" });
     } finally {
         if (connection) await connection.close();
     }

@@ -14,7 +14,9 @@ export function AuthProvider({ children }) {
 
     const logout = () => {
         setUsuario(null);
-        localStorage.removeItem('usuario');
+        // BLINDAJE: Limpiamos absolutamente todo el almacenamiento local
+        // Esto elimina el objeto usuario, el token JWT y cualquier rastro de la sesión
+        localStorage.clear(); 
     };
 
     return (
