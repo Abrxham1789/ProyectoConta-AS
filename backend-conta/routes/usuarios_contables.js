@@ -219,7 +219,7 @@ router.post('/usuarios/login', async (req, res) => {
         const usuarioDB = result.rows; 
 
         const jwtLocal = require('jsonwebtoken');
-        const secretoLocal = process.env.JWT_SECRET || 'LlaveSecretaUltraSeguraSistemas123';
+        const secretoLocal = process.env.JWT_SECRET;
 
         // Firmamos el Token JWT criptográfico de forma exitosa
         const token = jwtLocal.sign(

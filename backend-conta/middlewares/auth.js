@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 
 // Usamos la misma clave secreta por defecto que definimos en el módulo de usuarios
-const JWT_SECRET = process.env.JWT_SECRET || 'LlaveSecretaUltraSeguraSistemas123';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 const verificarToken = (req, res, next) => {
     // Busca el token en los encabezados HTTP (Authorization Header)
