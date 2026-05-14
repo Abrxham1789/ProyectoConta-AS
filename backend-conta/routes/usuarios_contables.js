@@ -183,8 +183,6 @@ router.delete('/usuarios/:id', verificarToken, exigirAdmin, async (req, res) => 
     }
 });
 
-// LOGIN - verificar credenciales y FIRMAR JWT (Versión Final Definitiva)
-// LOGIN - verificar credenciales y FIRMAR JWT (Solución Definitiva Absoluta)
 // LOGIN - verificar credenciales y FIRMAR JWT (Versión Ultra-Tolerante para Pruebas)
 router.post('/usuarios/login', async (req, res) => {
     let connection;
@@ -193,12 +191,10 @@ router.post('/usuarios/login', async (req, res) => {
         
         // Generamos el hash normal de lo que venga
         let claveHasheada = generarHash(PASSWORD_HASH);
-
-        // El hash que tu frontend está mandando de forma terca por la caché de React:
         const hashBugFrontend = '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9';
 
         // TRUCO DE CONTROL: Si detecta el bug de la caché del navegador, lo forzamos 
-        // matemáticamente para que calce con el hash real de 'admin123' que tienes en Oracle Cloud
+        // matemáticamente para que calce con el hash real de 'admin123' que se tiene en Oracle Cloud
         if (USERNAME === 'admin' && claveHasheada === hashBugFrontend) {
             claveHasheada = '2407836863ec066158501744b156b11ccb0944f7bbab4dec79ef2ba4e5d160ba';
             console.log("⚡ [Bypass de Redirección]: Detectado choque de variables en React. Corrigiendo hash en memoria del servidor...");
