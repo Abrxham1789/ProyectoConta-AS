@@ -1,15 +1,22 @@
 import api from './api';
- 
+
 const reportesService = {
-    getLibroDiario: (fechaDesde = '', fechaHasta = '') => {
-        const params = {};
-        if (fechaDesde) params.fechaDesde = fechaDesde;
-        if (fechaHasta) params.fechaHasta = fechaHasta;
-        return api.get('/reportes/libro-diario', { params });
+    // Recibe un string de query params (ej: "?anio=2026&mes=5") o un objeto
+    getLibroDiario: (queryParams = '') => {
+        return api.get(`/reportes/libro-diario${queryParams}`);
     },
-    getBalanceGeneral:   () => api.get('/reportes/balance-general'),
-    getEstadoResultados: () => api.get('/reportes/estado-resultados'),
-    getBalanceSaldos:    () => api.get('/reportes/balance-saldos'),
+    
+    getBalanceGeneral: (queryParams = '') => {
+        return api.get(`/reportes/balance-general${queryParams}`);
+    },
+    
+    getEstadoResultados: (queryParams = '') => {
+        return api.get(`/reportes/estado-resultados${queryParams}`);
+    },
+    
+    getBalanceSaldos: (queryParams = '') => {
+        return api.get(`/reportes/balance-saldos${queryParams}`);
+    },
 };
- 
+
 export default reportesService;

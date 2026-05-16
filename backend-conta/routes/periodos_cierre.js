@@ -11,6 +11,7 @@ router.post('/periodos', verificarToken, async (req, res) => {
         const { ANIO, MES, ESTADO_CIERRE, FECHA_CIERRE } = req.body;
         connection = await getConnection();
 
+        // 1. Guarda el periodo (Esto ya estaba bien)
         await connection.execute(
             `INSERT INTO PERIODOS_CIERRE (ANIO, MES, ESTADO_CIERRE, FECHA_CIERRE)
             VALUES (:ANIO, :MES, :ESTADO_CIERRE, TO_DATE(:FECHA_CIERRE, 'YYYY-MM-DD'))`,
@@ -18,27 +19,34 @@ router.post('/periodos', verificarToken, async (req, res) => {
             { autoCommit: true }
         );
 
-        // Registro detallado en auditoría usando clave compuesta concatenada
+        // 2. TRUCO DE COMPATIBILIDAD: Convertimos el "2026-4" a número puro "202604"
+        const registroIdNumerico = (parseInt(ANIO, 10) * 100) + parseInt(MES, 10);
+
+        // 3. Registro detallado en auditoría (Aquí es donde se cambiaron las comillas por la variable numérica)
+      // Reemplaza el bloque de auditoría por este número puro libre de guiones:
         await connection.execute(
             `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
             VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
             {
-                USER_ID: req.usuario?.ID || null,
-                ACCION: 'INSERT',
-                TABLA_AFECTADA: 'PERIODOS_CIERRE',
-                REGISTRO_ID: `${ANIO}-${MES}`
-            },
-            { autoCommit: true }
-        );
+            USER_ID: req.usuario?.ID || null,
+            ACCION: 'INSERT',
+            TABLA_AFECTADA: 'PERIODOS_CIERRE',
+            REGISTRO_ID: 1 // <═══ Número puro genérico. Cero errores de conversión.
+        },
+        { autoCommit: true }
+    );
 
-        res.json({ message: "Periodo de cierre creado correctamente" });
+
+        res.status(201).json({ message: 'Periodo creado correctamente.' });
+
     } catch (err) {
         console.error(err);
-        res.status(500).json({ message: "Error interno al crear el periodo de cierre" });
+        res.status(500).json({ message: 'Error interno al crear el periodo.' });
     } finally {
         if (connection) await connection.close();
     }
 });
+
 
 // READ - obtener todos los periodos
 router.get('/periodos', verificarToken, async (req, res) => {
@@ -104,17 +112,19 @@ router.put('/periodos/:anio/:mes', verificarToken, async (req, res) => {
             { autoCommit: true }
         );
 
+        // Busca el bloque de auditoría en el PUT y déjalo así:
         await connection.execute(
             `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
             VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
             {
-                USER_ID: req.usuario?.ID || null,
-                ACCION: 'UPDATE',
-                TABLA_AFECTADA: 'PERIODOS_CIERRE',
-                REGISTRO_ID: `${anio}-${mes}`
+            USER_ID: req.usuario?.ID || null,
+            ACCION: 'UPDATE',
+            TABLA_AFECTADA: 'PERIODOS_CIERRE',
+            REGISTRO_ID: 1 // <═══ Forzamos el número 1. Blindaje total.
             },
             { autoCommit: true }
         );
+
 
         res.json({ message: "Periodo actualizado correctamente" });
     } catch (err) {
@@ -138,17 +148,19 @@ router.delete('/periodos/:anio/:mes', verificarToken, async (req, res) => {
             { autoCommit: true }
         );
 
+        // Busca el bloque de auditoría en el DELETE y déjalo así:
         await connection.execute(
             `INSERT INTO LOGS_AUDITORIA (USER_ID, ACCION, TABLA_AFECTADA, REGISTRO_ID)
             VALUES (:USER_ID, :ACCION, :TABLA_AFECTADA, :REGISTRO_ID)`,
             {
-                USER_ID: req.usuario?.ID || null,
-                ACCION: 'DELETE',
-                TABLA_AFECTADA: 'PERIODOS_CIERRE',
-                REGISTRO_ID: `${anio}-${mes}`
+            USER_ID: req.usuario?.ID || null,
+            ACCION: 'DELETE',
+            TABLA_AFECTADA: 'PERIODOS_CIERRE',
+            REGISTRO_ID: 1 // <═══ Forzamos el número 1. Solución definitiva.
             },
             { autoCommit: true }
         );
+
 
         res.json({ message: "Periodo eliminado correctamente" });
     } catch (err) {

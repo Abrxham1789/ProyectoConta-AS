@@ -51,10 +51,18 @@ function Periodos() {
         } catch (err) { mostrarMensaje('Error al eliminar periodo', 'error'); }
     };
 
-    const handleAbrirModal = (p) => {
-        setFormEditar({ ANIO: p.ANIO, MES: p.MES, ESTADO_CIERRE: p.ESTADO_CIERRE, FECHA_CIERRE: p.FECHA_CIERRE || '' });
+        const handleAbrirModal = (p) => {
+        const fechaLimpia = p.FECHA_CIERRE ? String(p.FECHA_CIERRE).substring(0, 10) : '';
+        
+        setFormEditar({ 
+            ANIO: p.ANIO, 
+            MES: p.MES, 
+            ESTADO_CIERRE: p.ESTADO_CIERRE, 
+            FECHA_CIERRE: fechaLimpia 
+        });
         setModalVisible(true);
     };
+
 
     const handleActualizar = async () => {
         try {
@@ -76,6 +84,15 @@ function Periodos() {
 
     const inputClass = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1E3A5F] focus:border-transparent";
     const labelClass = "block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide";
+
+        // Helper para formatear las fechas ISO de Oracle Cloud a formato contable corto
+    const formatearFechaCortadeOracle = (raw) => {
+        if (!raw) return '—';
+        const parte = String(raw).substring(0, 10);
+        const [y, m, d] = parte.split('-');
+        if (!y || !m || !d) return raw;
+        return `${d}/${m}/${y}`;
+    };
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -133,7 +150,9 @@ function Periodos() {
                                         <td className="px-4 py-3">
                                             <span className={`px-2 py-1 rounded-full text-xs font-semibold ${p.ESTADO_CIERRE === 'ABIERTO' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{p.ESTADO_CIERRE}</span>
                                         </td>
-                                        <td className="px-4 py-3 text-gray-600">{p.FECHA_CIERRE}</td>
+                                        <td className="px-4 py-3 font-mono text-xs text-gray-600">
+                                            {formatearFechaCortadeOracle(p.FECHA_CIERRE)}
+                                        </td>
                                         <td className="px-4 py-3 text-center">
                                             <div className="flex flex-wrap gap-2 justify-center">
                                                 {p.ESTADO_CIERRE === 'CERRADO' ? (

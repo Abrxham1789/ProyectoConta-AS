@@ -106,10 +106,23 @@ function Polizas() {
         } catch (err) { mostrarMensaje('Error al eliminar póliza', 'error'); }
     };
 
-    const handleAbrirModal = (p) => {
-        setFormEditar({ POLIZA_ID: p.POLIZA_ID, ANIO: p.ANIO, MES: p.MES, NUM_POLIZA: p.NUM_POLIZA, FECHA: p.FECHA || '', TIPO_POLIZA: p.TIPO_POLIZA, ESTADO: p.ESTADO, SINOPSIS: p.SINOPSIS || '' });
+        const handleAbrirModal = (p) => {
+        // Cortamos los primeros 10 caracteres (YYYY-MM-DD) para eliminar las horas de Oracle
+        const fechaLimpia = p.FECHA ? String(p.FECHA).substring(0, 10) : '';
+
+        setFormEditar({
+            POLIZA_ID: p.POLIZA_ID,
+            NUM_POLIZA: p.NUM_POLIZA,
+            ANIO: p.ANIO,
+            MES: p.MES,
+            FECHA: fechaLimpia, // <═══ Ahora el input recibirá siempre "2026-04-01" nítido
+            TIPO_POLIZA: p.TIPO_POLIZA,
+            ESTADO: p.ESTADO,
+            SINOPSIS: p.SINOPSIS
+        });
         setModalVisible(true);
     };
+
 
     const handleActualizar = async () => {
         try {
@@ -129,6 +142,14 @@ function Polizas() {
 
     const inputClass = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1E3A5F] focus:border-transparent";
     const labelClass = "block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide";
+
+    const formatearFechaPóliza = (raw) => {
+        if (!raw) return '—';
+    const parte = String(raw).substring(0, 10); // Aísla "2026-04-01"
+    const [y, m, d] = parte.split('-');
+        if (!y || !m || !d) return raw;
+        return `${d}/${m}/${y}`; // Retorna "01/04/2026"
+    };
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -334,7 +355,9 @@ function Polizas() {
                                         <td className="px-4 py-3 text-gray-600">{p.ANIO}</td>
                                         <td className="px-4 py-3 text-gray-600">{p.MES}</td>
                                         <td className="px-4 py-3 text-gray-600">{p.NUM_POLIZA}</td>
-                                        <td className="px-4 py-3 text-gray-600">{p.FECHA}</td>
+                                        <td className="px-4 py-3 font-mono text-xs text-gray-600">
+                                            {formatearFechaPóliza(p.FECHA)}
+                                        </td>
                                         <td className="px-4 py-3 text-gray-600">{p.TIPO_POLIZA}</td>
                                         <td className="px-4 py-3">
                                             <span className={`px-2 py-1 rounded-full text-xs font-semibold ${p.ESTADO === 'AUTORIZADA' ? 'bg-green-100 text-green-700' : p.ESTADO === 'ANULADA' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{p.ESTADO}</span>

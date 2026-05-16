@@ -1,2 +1,3 @@
 WALLET_LOCATION = (SOURCE = (METHOD = file) (METHOD_DATA = (DIRECTORY="C:\ProyectoConta-AS\backend-conta\wallet")))
 SSL_SERVER_DN_MATCH=yes
+DISABLE_OOB = ON
