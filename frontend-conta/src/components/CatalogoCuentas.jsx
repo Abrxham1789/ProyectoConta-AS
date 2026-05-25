@@ -110,6 +110,7 @@ const CATEGORIAS_FILTRO = [
     { label: 'Ingresos',    prefijo: '4' },
     { label: 'Gastos',      prefijo: '5' },
     { label: 'Gastos Op.',  prefijo: '6' },  // REQ 4 — nuevo filtro nivel 6
+    { label: 'Cuentas Bancarias 🏦', prefijo: 'BANCOS' }
 ];
 
 // REQ 5 — Mapa de nombres por primer dígito
@@ -778,6 +779,7 @@ function CatalogoCuentas() {
     const [erroresEditar,  setErroresEditar]  = useState([]);
     const [filtroActivo,   setFiltroActivo]   = useState('');
     const [cuentaDesglose, setCuentaDesglose] = useState(null);
+    const [bancoExpandido, setBancoExpandido] = useState(null);
 
     // REQ 4 — estado del buscador por texto
     const [busqueda,       setBusqueda]       = useState('');
@@ -898,7 +900,6 @@ function CatalogoCuentas() {
     // ══════════════════════════════════════════════════════════════════
     // REQ 6 — Estado consolidado del botón "Crear Cuenta"
     // ══════════════════════════════════════════════════════════════════
-        // ── BUSCA ESTO EN EL PADRE (CatalogoCuentas) Y REEMPLÁZALO: ──
     const motivoID        = motivoIDInvalido(form.CUENTA_ID);
     const nombreCorto     = form.NOMBRE.trim().length > 0 && form.NOMBRE.trim().length < 3;
     
@@ -1092,31 +1093,32 @@ function CatalogoCuentas() {
                 ══════════════════════════════════════════════════════ */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 px-6 py-4 space-y-4">
 
-                    {/* Filtros por categoría */}
-                    <div>
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                            Filtrar por categoría
+                    {/* Filtros por categoría transformado en Desplegable */}
+                    <div className="w-full max-w-xs">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                            Filtrar por categoría o tipo
                         </p>
-                        <div className="flex flex-wrap gap-2">
+                        <select
+                            value={filtroActivo}
+                            onChange={(e) => {
+                                setFiltroActivo(e.target.value);
+                                setBusqueda('');           // limpia búsqueda al cambiar categoría
+                                setCuentaDesglose(null);
+                            }}
+                            className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 font-medium outline-none focus:ring-2 focus:ring-[#1E3A5F] focus:border-transparent shadow-sm transition-all cursor-pointer"
+                        >
                             {CATEGORIAS_FILTRO.map((cat) => (
-                                <button
-                                    key={cat.prefijo}
-                                    onClick={() => {
-                                        setFiltroActivo(cat.prefijo);
-                                        setBusqueda('');           // limpia búsqueda al cambiar categoría
-                                        setCuentaDesglose(null);
-                                    }}
-                                    className={`px-4 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-                                        filtroActivo === cat.prefijo && busqueda === ''
-                                            ? 'bg-[#1E3A5F] text-white border-[#1E3A5F] shadow-sm'
-                                            : 'bg-white text-gray-600 border-gray-300 hover:border-[#1E3A5F] hover:text-[#1E3A5F]'
-                                    }`}
+                                <option 
+                                    key={cat.prefijo} 
+                                    value={cat.prefijo}
+                                    className="py-1 text-gray-800"
                                 >
-                                    {cat.prefijo ? `${cat.prefijo} — ` : ''}{cat.label}
-                                </button>
+                                    {cat.prefijo && cat.prefijo !== 'BANCOS' ? `${cat.prefijo} — ` : ''}{cat.label}
+                                </option>
                             ))}
-                        </div>
+                        </select>
                     </div>
+
 
                     {/* REQ 4 — Buscador general por texto */}
                     <div className="relative">
@@ -1186,75 +1188,156 @@ function CatalogoCuentas() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {cuentas.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={8} className="text-center py-10 text-gray-400">
-                                            {busqueda
-                                                ? `Sin resultados para "${busqueda}".`
-                                                : filtroActivo
-                                                    ? `No hay cuentas en la categoría "${filtroActivo}".`
-                                                    : 'No hay cuentas registradas.'}
-                                        </td>
-                                    </tr>
-                                ) : cuentas.map((cuenta, i) => {
+                                {(() => {
+                                     
+                                    // 1. Filtramos las cuentas antes del render
+                                    const cuentasFiltradas = cuentas.filter(cuenta => {
+                                        if (filtroActivo === 'BANCOS') {
+                                            const idLimpio = String(cuenta.CUENTA_ID || '').replace(/[- ]/g, '');
+                                            return (
+                                                (String(cuenta.CUENTA_ID || '').startsWith('1-10') && idLimpio.length === 5) || 
+                                                (String(cuenta.CUENTA_ID || '').startsWith('110') && idLimpio.length === 5)
+                                            );
+                                        }
+                                        return true;
+                                    });
+
+                                    // 2. Si no hay registros con el filtro activo, tiramos el tr de aviso
+                                    if (cuentasFiltradas.length === 0) {
+                                        return (
+                                            <tr>
+                                                <td colSpan={8} className="text-center py-10 text-gray-400">
+                                                    {busqueda ? `Sin resultados para "${busqueda}".` : 'No hay cuentas registradas.'}
+                                                </td>
+                                            </tr>
+                                        );
+                                    }
+
+                                    // 3. El mapeo real se hace sobre la lista filtrada
+                                    return cuentasFiltradas.map((cuenta, i) => {
+
+
                                     const corrupto    = !esCoherente(cuenta);
                                     const seleccionada = cuentaDesglose?.CUENTA_ID === cuenta.CUENTA_ID;
+                                    
+                                    // ── DETECTOR DE BANCOS AUTOMÁTICO EN TU TABLA ──
+                                    const idLimpioTabla = String(cuenta.CUENTA_ID || '').replace(/[- ]/g, '');
+                                    const esCuentaBanco = 
+                                        (String(cuenta.CUENTA_ID || '').startsWith('1-10') && idLimpioTabla.length === 5) || 
+                                        (String(cuenta.CUENTA_ID || '').startsWith('110') && idLimpioTabla.length === 5);
+
+                                    // Verifica si tiene guardado un número de referencia física en Oracle
+                                    const tieneReferencia = cuenta.NUM_REFERENCIA !== null && cuenta.NUM_REFERENCIA !== undefined && String(cuenta.NUM_REFERENCIA).trim() !== '';
+                                    
+                                    // Se muestra la flecha si es cuenta de banco y tiene datos que mostrar
+                                    const mostrarAcordeonBanco = esCuentaBanco && tieneReferencia;
+                                    const estaBancoAbierto     = bancoExpandido === cuenta.CUENTA_ID;
+
                                     return (
-                                        <tr
-                                            key={cuenta.CUENTA_ID}
-                                            className={`
-                                                ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
-                                                ${corrupto     ? 'border-l-4 border-amber-400' : ''}
-                                                ${seleccionada ? 'ring-2 ring-inset ring-[#1E3A5F]/30' : ''}
-                                            `}
-                                        >
-                                            <td className="px-4 py-3 font-mono text-gray-600">{cuenta.CUENTA_ID}</td>
-                                            <td className="px-4 py-3 font-medium text-gray-800">
-                                                {cuenta.NOMBRE}
-                                                {corrupto && (
-                                                    <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold">
-                                                        ⚠ Inconsistente
+                                        <>
+                                            {/* ── FILA PRINCIPAL DE LA CUENTA ── */}
+                                            <tr
+                                                key={cuenta.CUENTA_ID}
+                                                className={`
+                                                    transition-colors
+                                                    ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
+                                                    ${corrupto     ? 'border-l-4 border-amber-400' : ''}
+                                                    ${seleccionada ? 'ring-2 ring-inset ring-[#1E3A5F]/30' : ''}
+                                                    ${estaBancoAbierto ? 'bg-blue-50/30' : ''}
+                                                `}
+                                            >
+                                                <td className="px-4 py-3 font-mono text-gray-600">
+                                                    <div className="flex items-center gap-1.5">
+                                                        {/* Flecha interactiva: Solo aparece en cuentas de banco */}
+                                                        {mostrarAcordeonBanco && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setBancoExpandido(estaBancoAbierto ? null : cuenta.CUENTA_ID)}
+                                                                className={`p-0.5 rounded hover:bg-gray-200 text-[#1E3A5F] font-bold text-[10px] transition-transform duration-200 ${
+                                                                    estaBancoAbierto ? 'rotate-90' : ''
+                                                                }`}
+                                                                title="Ver cuenta bancaria"
+                                                            >
+                                                                ▶
+                                                            </button>
+                                                        )}
+                                                        {cuenta.CUENTA_ID}
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 font-medium text-gray-800">
+                                                    <div className="flex items-center gap-2">
+                                                        <span>{cuenta.NOMBRE}</span>
+                                                        {esCuentaBanco && (
+                                                            <span className="bg-blue-100 text-[#1E3A5F] text-[10px] font-bold px-1.5 py-0.5 rounded tracking-wide uppercase">
+                                                                Banco
+                                                            </span>
+                                                        )}
+                                                        {corrupto && (
+                                                            <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold">
+                                                                ⚠ Inconsistente
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 text-gray-600">{cuenta.TIPO_SALDO}</td>
+                                                <td className="px-4 py-3 text-gray-600">{cuenta.CLASIFICACION_HOJA?.replace(/_/g, ' ')}</td>
+                                                <td className="px-4 py-3 text-gray-600">{cuenta.RUBRO}</td>
+                                                <td className="px-4 py-3 text-gray-600">{cuenta.SUB_RUBRO}</td>
+                                                <td className="px-4 py-3">
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${badgeEstado(cuenta.ESTADO)}`}>
+                                                        {cuenta.ESTADO}
                                                     </span>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3 text-gray-600">{cuenta.TIPO_SALDO}</td>
-                                            <td className="px-4 py-3 text-gray-600">{cuenta.CLASIFICACION_HOJA?.replace(/_/g, ' ')}</td>
-                                            <td className="px-4 py-3 text-gray-600">{cuenta.RUBRO}</td>
-                                            <td className="px-4 py-3 text-gray-600">{cuenta.SUB_RUBRO}</td>
-                                            <td className="px-4 py-3">
-                                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${badgeEstado(cuenta.ESTADO)}`}>
-                                                    {cuenta.ESTADO}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3 text-center whitespace-nowrap space-x-1">
-                                                <button
-                                                    onClick={() => setCuentaDesglose(seleccionada ? null : cuenta)}
-                                                    className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1 rounded-lg text-xs font-medium transition-all"
-                                                    title="Ver desglose del código"
-                                                >
-                                                    {seleccionada ? '▲ Ocultar' : '🔍 Ver'}
-                                                </button>
-                                                <button
-                                                    onClick={() => handleAbrirModal(cuenta)}
-                                                    className="bg-[#2E75B6] hover:bg-[#1E3A5F] text-white px-3 py-1 rounded-lg text-xs font-medium transition-all"
-                                                >
-                                                    {corrupto ? '🔧 Rescatar' : 'Editar'}
-                                                </button>
-                                                <button
-                                                    onClick={() => confirmarEliminar(cuenta.CUENTA_ID)}
-                                                    className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg text-xs font-medium transition-all"
-                                                >
-                                                    Eliminar
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
+                                                </td>
+                                                <td className="px-4 py-3 text-center whitespace-nowrap space-x-1">
+                                                    <button
+                                                        onClick={() => setCuentaDesglose(seleccionada ? null : cuenta)}
+                                                        className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1 rounded-lg text-xs font-medium transition-all"
+                                                        title="Ver desglose del código"
+                                                    >
+                                                        {seleccionada ? '▲ Ocultar' : '🔍 Ver'}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleAbrirModal(cuenta)}
+                                                        className="bg-[#2E75B6] hover:bg-[#1E3A5F] text-white px-3 py-1 rounded-lg text-xs font-medium transition-all"
+                                                    >
+                                                        {corrupto ? '🔧 Rescatar' : 'Editar'}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => confirmarEliminar(cuenta.CUENTA_ID)}
+                                                        className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg text-xs font-medium transition-all"
+                                                    >
+                                                        Eliminar
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                                                                      {/* ── SUB-FILA DE DETALLE (MUESTRA TU CAMPO NUM_REFERENCIA) ── */}
+                                            {mostrarAcordeonBanco && estaBancoAbierto && (
+                                                <tr className="bg-blue-50/20 border-l-4 border-[#1E3A5F] transition-all">
+                                                    <td colSpan={8} className="px-8 py-2.5 bg-gradient-to-r from-blue-50/30 to-transparent">
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="text-[11px] font-bold uppercase tracking-wider text-[#1E3A5F]">
+                                                                Detalle Bancario de la Cuenta:
+                                                            </span>
+                                                            <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-1 shadow-sm">
+                                                                <span className="text-xs text-gray-500 font-medium">No. Cuenta Física:</span>
+                                                                <span className="font-mono text-xs font-bold text-gray-900 tracking-wider">
+                                                                    {cuenta.NUM_REFERENCIA}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </>
+                                       );
+                                     })}
+                                  )()}
                             </tbody>
                         </table>
                     </div>
                 </div>
             </main>
+     
 
             {/* ── Modal Editar / Rescatar ── */}
             {modalVisible && (
