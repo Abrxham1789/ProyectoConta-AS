@@ -287,7 +287,7 @@ function Periodos() {
                             <div className="flex items-start gap-3 bg-amber-50 border border-amber-300 rounded-lg px-4 py-2.5 max-w-xl animate-fadeIn">
                                 <span className="text-amber-500 text-sm mt-0.5 shrink-0">🔒</span>
                                 <div>
-                                    <p className="text-[11px] font-bold text-amber-700 uppercase tracking-wide mb-0.5">Asistente de Ingreso</p>
+                                    <p className="text-[11px] font-bold text-amber-700 uppercase tracking-wide mb-0.5">Botón bloqueado</p>
                                     <p className="text-xs text-amber-800 font-medium leading-relaxed">{guiaBloqueoPeriodo}</p>
                                 </div>
                             </div>

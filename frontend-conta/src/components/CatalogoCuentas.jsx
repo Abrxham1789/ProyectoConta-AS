@@ -1081,10 +1081,19 @@ function CatalogoCuentas() {
                         >
                             + Crear Cuenta
                         </button>
-                        {/* REQ 6 — Texto dinámico del bloqueo */}
+                                                {/* ── NOTIFICACIÓN DINÁMICA DE AYUDA AL USUARIO (PREMIUM) ── */}
                         {botonDeshabilitado && textoBloqueo && (
-                            <p className="text-red-500 text-xs mt-2">{textoBloqueo}</p>
+                            <div className="flex items-start gap-3 bg-amber-50 border border-amber-300 rounded-lg px-4 py-2.5 max-w-xl mt-3 animate-fadeIn">
+                                <span className="text-amber-500 text-sm mt-0.5 shrink-0">🔒</span>
+                                <div>
+                                    <p className="text-[11px] font-bold text-amber-700 uppercase tracking-wide mb-0.5">Botón bloqueado</p>
+                                    <p className="text-xs text-amber-800 font-medium leading-relaxed">
+                                        {textoBloqueo.toLowerCase().includes('bloqueado') ? textoBloqueo : `Botón bloqueado: ${textoBloqueo.replace('⚠️', '').trim()}`}
+                                    </p>
+                                </div>
+                            </div>
                         )}
+
                     </div>
                 </div>
 
@@ -1310,7 +1319,7 @@ function CatalogoCuentas() {
                                                     </button>
                                                 </td>
                                             </tr>
-                                                                                      {/* ── SUB-FILA DE DETALLE (MUESTRA TU CAMPO NUM_REFERENCIA) ── */}
+                                            {/* ── SUB-FILA DE DETALLE (MUESTRA TU CAMPO NUM_REFERENCIA) ── */}
                                             {mostrarAcordeonBanco && estaBancoAbierto && (
                                                 <tr className="bg-blue-50/20 border-l-4 border-[#1E3A5F] transition-all">
                                                     <td colSpan={8} className="px-8 py-2.5 bg-gradient-to-r from-blue-50/30 to-transparent">
