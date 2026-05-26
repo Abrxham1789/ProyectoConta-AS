@@ -1,5 +1,5 @@
 import { useAuth } from '../context/AuthContext';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import periodosService from '../services/periodosService';
 import Toast from './Toast';
@@ -7,13 +7,52 @@ import Toast from './Toast';
 function Periodos() {
     const navigate = useNavigate();
     const { usuario } = useAuth();
+    
+    // ── ESTADOS CONTABLES ORIGINALES COMBINADOS (UNA SOLA DECLARACIÓN) ──
     const [periodos, setPeriodos] = useState([]);
     const [mensaje, setMensaje] = useState({ texto: '', tipo: '' });
     const [form, setForm] = useState({ ANIO: '', MES: '', ESTADO_CIERRE: 'ABIERTO', FECHA_CIERRE: '' });
     const [modalVisible, setModalVisible] = useState(false);
     const [modalEliminar, setModalEliminar] = useState({ visible: false, anio: null, mes: null });
-    const [modalReabrir, setModalReabrir] = useState({ visible: false, anio: null, mes: null });
     const [formEditar, setFormEditar] = useState({ ANIO: '', MES: '', ESTADO_CIERRE: '', FECHA_CIERRE: '' });
+
+    // ── NUEVOS ESTADOS DE BLINDAJE Y CONTROL UX ──
+    const [modalReabrir, setModalReabrir] = useState({ visible: false, anio: null, mes: null, justificacion: '' });
+    const [errores, setErrores] = useState({ ANIO: '', MES: '', FECHA_CIERRE: '', JUSTIFICACION: '' });
+    const [touched, setTouched] = useState({ ANIO: false, MES: false, FECHA_CIERRE: false });
+
+    // ── EVALUADORES DE ERROR CONTABLES MUTABLES ──
+    function evaluarAnio(val, bloqueadoTeclado) {
+        if (bloqueadoTeclado) return '⚠️ Acción no permitida: Solo se permiten números para registrar el año (Ej. 2025).';
+        if (!val || val.trim() === '') return '⚠️ Este campo es obligatorio. Por favor, llene el campo para continuar.';
+        if (val.length < 4) return '⚠️ El año está incompleto. Debe constar de exactamente 4 números.';
+        if (/^(.)\1{3}$/.test(val)) return '⚠️ Error de coherencia: No se permite un año compuesto por un solo dígito repetido.';
+        const n = parseInt(val, 10);
+        if (n < 2000 || n > 2050) return '⚠️ Ejercicio inválido: Ingrese un año coherente para el período contable (2000 - 2050).';
+        return '';
+    }
+
+    function evaluarMes(val, bloqueadoTeclado) {
+        if (bloqueadoTeclado) return '⚠️ Acción no permitida: En el campo Mes solo se permiten números del 1 al 12.';
+        if (!val || val.trim() === '') return '⚠️ Este campo es obligatorio. Por favor, llene el campo para continuar.';
+        const n = parseInt(val, 10);
+        if (isNaN(n) || n < 1 || n > 12) return '⚠️ Mes inválido: El mes debe estar estrictamente en el rango del 1 al 12 (Ej. 05).';
+        return '';
+    }
+
+    function evaluarFechaCierre(val) {
+        if (!val || val.trim() === '') return '⚠️ Campo requerido: Seleccione la fecha límite en el calendario contable.';
+        return '';
+    }
+
+    function evaluarJustificacion(val) {
+        if (!val || val.trim() === '') return '⚠️ Justificación obligatoria: Debe explicar por qué está reabriendo un período clausurado.';
+        if (val.trim().length < 10) return '⚠️ Descripción muy corta: El motivo de auditoría debe tener al menos 10 caracteres.';
+        if (/(.)\1{3,}/.test(val)) return '⚠️ Error de tipeo: Evite secuencias redundantes de letras repetidas sin sentido (Ej. "jjjj").';
+        return '';
+    }
+
+
 
     useEffect(() => { cargarPeriodos(); }, []);
 
@@ -29,7 +68,70 @@ function Periodos() {
         } catch (err) { mostrarMensaje('Error al cargar periodos', 'error'); }
     };
 
-    const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+        const handleChange = (e) => {
+        const { name, value } = e.target;
+
+        // ── CONTROL DE INGRESO: AÑO ──
+        if (name === 'ANIO') {
+            if (value !== '' && !/^\d*$/.test(value)) {
+                setErrores(prev => ({ ...prev, ANIO: evaluarAnio('', true) }));
+                return;
+            }
+            if (value.length > 4) return;
+            setForm(prev => ({ ...prev, ANIO: value }));
+            const msg = evaluarAnio(value, false);
+            setErrores(prev => ({ ...prev, ANIO: (!msg || msg.includes('obligatorio')) ? (touched.ANIO ? msg : '') : msg }));
+            return;
+        }
+
+        // ── CONTROL DE INGRESO: MES ──
+        if (name === 'MES') {
+            if (value !== '' && !/^\d*$/.test(value)) {
+                setErrores(prev => ({ ...prev, MES: evaluarMes('', true) }));
+                return;
+            }
+            if (value.length > 2) return;
+            setForm(prev => ({ ...prev, MES: value }));
+            const msg = evaluarMes(value, false);
+            setErrores(prev => ({ ...prev, MES: (!msg || msg.includes('obligatorio')) ? (touched.MES ? msg : '') : msg }));
+            return;
+        }
+
+        // ── CONTROL DE INGRESO: FECHA CIERRE (CALENDARIO) ──
+        if (name === 'FECHA_CIERRE') {
+            setForm(prev => ({ ...prev, FECHA_CIERRE: value }));
+            setErrores(prev => ({ ...prev, FECHA_CIERRE: evaluarFechaCierre(value) }));
+            return;
+        }
+
+        setForm({ ...form, [name]: value });
+    };
+
+    const handleBlur = (e) => {
+        const { name, value } = e.target;
+        setTouched(prev => ({ ...prev, [name]: true }));
+        if (name === 'ANIO') setErrores(prev => ({ ...prev, ANIO: evaluarAnio(value, false) }));
+        if (name === 'MES')  setErrores(prev => ({ ...prev, MES: evaluarMes(value, false) }));
+        if (name === 'FECHA_CIERRE') setErrores(prev => ({ ...prev, FECHA_CIERRE: evaluarFechaCierre(value) }));
+    };
+        // ── MENSAJE DINÁMICO DE BLOQUEO DEL BOTÓN PERÍODO ──
+    const guiaBloqueoPeriodo = useMemo(() => {
+        const errAnio = evaluarAnio(form.ANIO, false);
+        const errMes  = evaluarMes(form.MES, false, []);
+        const errFec  = evaluarFechaCierre(form.FECHA_CIERRE);
+
+        if (!form.ANIO || !form.MES || !form.FECHA_CIERRE) {
+            return '📋 Completa todos los campos obligatorios para dar de alta el período.';
+        }
+        if (errAnio) return `📅 Campo Año incorrecto: ${errAnio.replace('⚠️ ', '')}`;
+        if (errMes)  return `📆 Campo Mes incorrecto: ${errMes.replace('⚠️ ', '')}`;
+        if (errFec)  return `📌 Campo Fecha incorrecto: ${errFec.replace('⚠️ ', '')}`;
+        
+        return '';
+    }, [form, errores]);
+
+    const botonCrearBloqueado = !!guiaBloqueoPeriodo;
+
     const handleChangeEditar = (e) => setFormEditar({ ...formEditar, [e.target.name]: e.target.value });
 
     const handleCrear = async () => {
@@ -110,22 +212,89 @@ function Periodos() {
                 </div>
             </header>
             <main className="max-w-7xl mx-auto px-8 py-8">
+                                {/* ── RECIPROCO CORREGIDO: NUEVO PERIODO CON CALENDARIO Y EXCEPCIONES MUTABLES ── */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
                     <h2 className="text-[#1E3A5F] font-bold text-lg mb-5 pb-3 border-b border-gray-100">Nuevo Periodo</h2>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div><label className={labelClass}>Año</label><input name="ANIO" className={inputClass} placeholder="Ej. 2025" onChange={handleChange} /></div>
-                        <div><label className={labelClass}>Mes</label><input name="MES" className={inputClass} placeholder="Ej. 1" onChange={handleChange} /></div>
+                        
+                        {/* AÑO */}
+                        <div>
+                            <label className={labelClass}>Año</label>
+                            <input 
+                                name="ANIO" 
+                                value={form.ANIO}
+                                className={errores.ANIO ? "w-full border border-red-400 bg-red-50 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-400 transition-colors" : inputClass} 
+                                placeholder="Ej. 2025" 
+                                onChange={handleChange} 
+                                onBlur={handleBlur} 
+                            />
+                            {errores.ANIO && <p className="text-red-500 text-xs mt-1 leading-snug">{errores.ANIO}</p>}
+                        </div>
+
+                        {/* MES */}
+                        <div>
+                            <label className={labelClass}>Mes</label>
+                            <input 
+                                name="MES" 
+                                value={form.MES}
+                                className={errores.MES ? "w-full border border-red-400 bg-red-50 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-400 transition-colors" : inputClass} 
+                                placeholder="Ej. 1" 
+                                onChange={handleChange} 
+                                onBlur={handleBlur} 
+                            />
+                            {errores.MES && <p className="text-red-500 text-xs mt-1 leading-snug">{errores.MES}</p>}
+                        </div>
+
+                        {/* ESTADO */}
                         <div>
                             <label className={labelClass}>Estado</label>
-                            <select name="ESTADO_CIERRE" className={inputClass} onChange={handleChange}>
+                            <select name="ESTADO_CIERRE" value={form.ESTADO_CIERRE} className={inputClass} onChange={handleChange}>
                                 <option value="ABIERTO">ABIERTO</option>
                                 <option value="CERRADO">CERRADO</option>
                             </select>
                         </div>
-                        <div><label className={labelClass}>Fecha Cierre</label><input name="FECHA_CIERRE" className={inputClass} placeholder="YYYY-MM-DD" onChange={handleChange} /></div>
+
+                        {/* FECHA CIERRE (CALENDARIO INTERACTIVO) */}
+                        <div>
+                            <label className={labelClass}>Fecha Cierre</label>
+                            {/* CAMBIO RADICAL: Se activa el DatePicker nativo con type="date" */}
+                            <input 
+                                name="FECHA_CIERRE" 
+                                type="date" 
+                                value={form.FECHA_CIERRE || ''} // ← Agregar el || '' aquí blinda el input
+                                className={errores.FECHA_CIERRE ? "w-full border border-red-400 bg-red-50 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-400 transition-colors" : inputClass} 
+                                onChange={handleChange} 
+                                onBlur={handleBlur} 
+                            />
+                            {errores.FECHA_CIERRE && <p className="text-red-500 text-xs mt-1 leading-snug">{errores.FECHA_CIERRE}</p>}
+                        </div>
                     </div>
-                    <div className="mt-5"><button onClick={handleCrear} className="bg-[#1E3A5F] hover:bg-[#2a4f7c] text-white px-6 py-2 rounded-lg text-sm font-semibold transition-all shadow-sm">+ Crear Periodo</button></div>
+
+                                       {/* ── BOTÓN Y ASISTENTE DE BLOQUEO DE PERÍODOS ── */}
+                    <div className="mt-5 flex flex-col gap-3">
+                        <div>
+                            <button 
+                                onClick={handleCrear} 
+                                disabled={botonCrearBloqueado} 
+                                className="bg-[#1E3A5F] hover:bg-[#2a4f7c] disabled:opacity-45 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg text-sm font-semibold transition-all shadow-sm"
+                            >
+                                + Crear Periodo
+                            </button>
+                        </div>
+
+                        {/* Tarjeta dinámica de Micro-UX que educa al usuario */}
+                        {botonCrearBloqueado && guiaBloqueoPeriodo && (
+                            <div className="flex items-start gap-3 bg-amber-50 border border-amber-300 rounded-lg px-4 py-2.5 max-w-xl animate-fadeIn">
+                                <span className="text-amber-500 text-sm mt-0.5 shrink-0">🔒</span>
+                                <div>
+                                    <p className="text-[11px] font-bold text-amber-700 uppercase tracking-wide mb-0.5">Asistente de Ingreso</p>
+                                    <p className="text-xs text-amber-800 font-medium leading-relaxed">{guiaBloqueoPeriodo}</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
+
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                     <div className="px-6 py-4 border-b border-gray-100">
                         <h2 className="text-[#1E3A5F] font-bold text-lg">Periodos Registrados</h2>
@@ -172,6 +341,8 @@ function Periodos() {
                     </div>
                 </div>
             </main>
+
+
             {modalVisible && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
@@ -189,7 +360,17 @@ function Periodos() {
                                     <option value="CERRADO">CERRADO</option>
                                 </select>
                             </div>
-                            <div><label className={labelClass}>Fecha Cierre</label><input name="FECHA_CIERRE" value={formEditar.FECHA_CIERRE} onChange={handleChangeEditar} className={inputClass} placeholder="YYYY-MM-DD" /></div>
+                                <div>
+                                <label className={labelClass}>Fecha Cierre</label>
+                                <input 
+                                    name="FECHA_CIERRE" 
+                                    type="date" 
+                                    value={formEditar.FECHA_CIERRE} 
+                                    onChange={handleChangeEditar} 
+                                    className={inputClass} 
+                                />
+                            </div>
+
                         </div>
                         <div className="px-6 pb-6 flex gap-3 justify-end">
                             <button onClick={() => setModalVisible(false)} className="px-5 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-all">Cancelar</button>
@@ -198,28 +379,53 @@ function Periodos() {
                     </div>
                 </div>
             )}
+                       {/* ── MODAL REABRIR NUEVO CON JUSTIFICACIÓN DE AUDITORÍA ── */}
             {modalReabrir.visible && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4">
-                        <div className="bg-amber-500 text-white px-6 py-4 rounded-t-xl flex items-center justify-between">
-                            <h3 className="font-bold text-lg">⚠️ Reabrir Periodo</h3>
-                            <button onClick={() => setModalReabrir({ visible: false, anio: null, mes: null })} className="text-white/70 hover:text-white text-xl">✕</button>
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+                        <div className="bg-amber-500 text-white px-6 py-4 flex items-center justify-between">
+                            <h3 className="font-bold text-lg">⚠️ Autorizar Reapertura</h3>
+                            <button onClick={() => setModalReabrir({ visible: false, anio: null, mes: null, justificacion: '' })} className="text-white/70 hover:text-white text-xl">✕</button>
                         </div>
-                        <div className="p-6 text-center">
-                            <p className="text-gray-700 font-semibold mb-2">
-                                Periodo: {modalReabrir.mes}/{modalReabrir.anio}
-                            </p>
-                            <p className="text-gray-500 text-sm mb-6">
-                                ¿Está seguro de reabrir este periodo? Esto permitirá modificar saldos y movimientos contables. Esta acción quedará registrada en auditoría.
-                            </p>
+                        <div className="p-6">
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-amber-900 text-xs font-medium mb-4">
+                                🚩 Advertencia: Reabrir el período **{modalReabrir.mes}/{modalReabrir.anio}** romperá el bloqueo de diarios en Oracle Cloud, permitiendo alteración de movimientos contables.
+                            </div>
+                            <div className="mb-5">
+                                <label className={labelClass}>Justificación / Motivo de Auditoría</label>
+                                <textarea
+                                    rows="3"
+                                    value={modalReabrir.justificacion}
+                                    placeholder="Ej. Ajuste extraordinario solicitado por la gerencia financiera..."
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        // Bloqueo físico inmediato de símbolos, espacios dobles y letras redundantes
+                                        if (val !== '' && !/^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s\-\.\,]*$/.test(val)) return;
+                                        if (/\s{2,}/.test(val)) return;
+                                        if (/(.)\1{3,}/.test(val)) return;
+
+                                        setModalReabrir(prev => ({ ...prev, justificacion: val }));
+                                        setErrores(prev => ({ ...prev, JUSTIFICACION: evaluarJustificacion(val) }));
+                                    }}
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none"
+                                />
+                                {errores.JUSTIFICACION && <p className="text-red-500 text-xs mt-1 font-semibold">{errores.JUSTIFICACION}</p>}
+                            </div>
                             <div className="flex gap-3 justify-center">
-                                <button onClick={() => setModalReabrir({ visible: false, anio: null, mes: null })} className="px-5 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-all">Cancelar</button>
-                                <button onClick={handleReabrir} className="px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold transition-all">Sí, reabrir</button>
+                                <button onClick={() => setModalReabrir({ visible: false, anio: null, mes: null, justificacion: '' })} className="px-5 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-all">Cancelar</button>
+                                <button 
+                                    onClick={handleReabrir} 
+                                    disabled={!!evaluarJustificacion(modalReabrir.justificacion)}
+                                    className="px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all"
+                                >
+                                    Sí, reabrir período
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
             )}
+
             {modalEliminar.visible && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4">
