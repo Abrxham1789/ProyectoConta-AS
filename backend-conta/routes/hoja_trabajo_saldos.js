@@ -48,28 +48,76 @@ router.post('/hoja-trabajo', verificarToken, async (req, res) => {
 });
 
 // READ - obtener todos los saldos
-router.get('/hoja-trabajo', verificarToken, async (req, res) => {
+// READ AUTOMATIZADO - Calcular y obtener saldos consolidando catálogo y pólizas por período
+router.get('/hoja-trabajo/:anio/:mes', verificarToken, async (req, res) => {
     let connection;
     try {
+        const { anio, mes } = req.params;
         connection = await getConnection();
 
+        // REQ ENHANCEMENT: Query híbrido avanzado de Oracle.
+        // Consolida el catálogo con los movimientos reales de las pólizas autorizadas.
+        const sqlQuery = `
+            SELECT 
+                :anio AS ANIO,
+                :mes AS MES,
+                c.CUENTA_ID,
+                c.NOMBRE AS NOMBRE_CUENTA,
+                
+                -- 1. BALANZA DE SALDOS (Cálculo acumulado de pólizas normales de Diario/Apertura)
+                NVL(SUM(CASE 
+                    WHEN p.TIPO_POLIZA IN ('DIARIO', 'APERTURA') THEN d.DEBE 
+                    ELSE 0 
+                END), 0) AS SALDO_DEUDOR,
+                
+                NVL(SUM(CASE 
+                    WHEN p.TIPO_POLIZA IN ('DIARIO', 'APERTURA') THEN d.HABER 
+                    ELSE 0 
+                END), 0) AS SALDO_ACREEDOR,
+                
+                -- 2. AJUSTES DEL PERÍODO (Cálculo exclusivo de pólizas clasificadas como AJUSTE)
+                NVL(SUM(CASE 
+                    WHEN p.TIPO_POLIZA = 'AJUSTE' THEN d.DEBE 
+                    ELSE 0 
+                END), 0) AS AJUSTE_DEBE,
+                
+                NVL(SUM(CASE 
+                    WHEN p.TIPO_POLIZA = 'AJUSTE' THEN d.HABER 
+                    ELSE 0 
+                END), 0) AS AJUSTE_HABER
+                
+            FROM CATALOGO_CUENTAS c
+            LEFT JOIN POLIZAS_DETALLE d ON c.CUENTA_ID = d.CUENTA_ID
+            LEFT JOIN POLIZAS_CABECERA p ON d.POLIZA_ID = p.POLIZA_ID 
+                AND p.ANIO = :anio 
+                AND p.MES = :mes
+                AND p.ESTADO = 'AUTORIZADA' -- Excepción contable: Solo procesar transacciones aprobadas
+            GROUP BY c.CUENTA_ID, c.NOMBRE
+            ORDER BY c.CUENTA_ID
+        `;
+
         const result = await connection.execute(
-            `SELECT h.*, c.NOMBRE AS NOMBRE_CUENTA
-            FROM HOJA_TRABAJO_SALDOS h
-            JOIN CATALOGO_CUENTAS c ON h.CUENTA_ID = c.CUENTA_ID
-            ORDER BY h.ANIO DESC, h.MES DESC, h.CUENTA_ID`,
-            [],
+            sqlQuery,
+            { anio, mes },
             { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );
 
+        // Excepción de datos: Si el catálogo está completamente vacío en la base de datos
+        if (!result.rows || result.rows.length === 0) {
+            return res.json([]); // Retorna array vacío limpio, el Frontend disparará su alerta Micro-UX
+        }
+
         res.json(result.rows);
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: "Error al obtener los saldos de la hoja de trabajo" });
+        console.error("🚨 Error crítico en consolidación de Hoja de Trabajo:", err);
+        res.status(500).json({ 
+            message: "Error interno en el servidor de Oracle al procesar y consolidar la hoja de trabajo corporativa." 
+        });
     } finally {
         if (connection) await connection.close();
     }
 });
+
 
 // READ - obtener saldos por periodo
 router.get('/hoja-trabajo/:anio/:mes', verificarToken, async (req, res) => {

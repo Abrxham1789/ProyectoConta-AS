@@ -1,177 +1,593 @@
 import { useAuth } from '../context/AuthContext';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import hojaTrabajoService from '../services/hojaTrabajoService';
 import Toast from './Toast';
 
-function HojaTrabajoSaldos() {
-    const navigate = useNavigate();
-    const { usuario } = useAuth();
-    const [saldos, setSaldos] = useState([]);
-    const [mensaje, setMensaje] = useState({ texto: '', tipo: '' });
-    const [form, setForm] = useState({ ANIO: '', MES: '', CUENTA_ID: '', SALDO_DEUDOR: '', SALDO_ACREEDOR: '', AJUSTE_DEBE: '', AJUSTE_HABER: '' });
-    const [modalVisible, setModalVisible] = useState(false);
-    const [modalEliminar, setModalEliminar] = useState({ visible: false, anio: null, mes: null, cuentaId: null });
-    const [formEditar, setFormEditar] = useState({ ANIO: '', MES: '', CUENTA_ID: '', SALDO_DEUDOR: '', SALDO_ACREEDOR: '', AJUSTE_DEBE: '', AJUSTE_HABER: '' });
+const ANIOS = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i);
+const MESES = [
+    { value: 1,  label: 'Enero'      }, { value: 2,  label: 'Febrero'    },
+    { value: 3,  label: 'Marzo'      }, { value: 4,  label: 'Abril'      },
+    { value: 5,  label: 'Mayo'       }, { value: 6,  label: 'Junio'      },
+    { value: 7,  label: 'Julio'      }, { value: 8,  label: 'Agosto'     },
+    { value: 9,  label: 'Septiembre' }, { value: 10, label: 'Octubre'    },
+    { value: 11, label: 'Noviembre'  }, { value: 12, label: 'Diciembre'  },
+];
 
-    useEffect(() => { cargarSaldos(); }, []);
+/* ─── Helpers ─────────────────────────────────────────────────────────── */
+const n = (v) => parseFloat(v) || 0;
+const fmt = (v) => v > 0 ? v.toFixed(2) : '—';
+const fmtSum = (v) => v.toFixed(2);
+
+function calcularFila(s) {
+    const d  = n(s.SALDO_DEUDOR);
+    const a  = n(s.SALDO_ACREEDOR);
+    const ad = n(s.AJUSTE_DEBE);
+    const ah = n(s.AJUSTE_HABER);
+
+    const neto = (d - a) + (ad - ah);
+    const sajD = neto > 0 ? neto : 0;
+    const sajA = neto < 0 ? Math.abs(neto) : 0;
+
+    const id = String(s.CUENTA_ID || '').trim();
+    const esResultados = ['4','5','6'].some(p => id.startsWith(p));
+    const esBalance    = ['1','2','3'].some(p => id.startsWith(p));
+
+    return {
+        d, a, ad, ah, sajD, sajA,
+        perdida:  esResultados ? sajD : 0,
+        ganancia: esResultados ? sajA : 0,
+        activo:   esBalance    ? sajD : 0,
+        pasPat:   esBalance    ? sajA : 0,
+    };
+}
+
+/* ─── Componente principal ────────────────────────────────────────────── */
+function HojaTrabajoSaldos() {
+    const navigate  = useNavigate();
+    const { usuario } = useAuth();
+    const tablaRef  = useRef(null);
+
+    /* Estado principal */
+    const [saldos,    setSaldos]    = useState([]);
+    const [mensaje,   setMensaje]   = useState({ texto: '', tipo: '' });
+    const [cargando,  setCargando]  = useState(false);
+    const [generado,  setGenerado]  = useState(false);
+    const [sinDatos,  setSinDatos]  = useState(false);
+    const [filtro,    setFiltro]    = useState({ ANIO: '', MES: '' });
+    const [periodoLabel, setPeriodoLabel] = useState('');
+
+    /* Estado modal edición manual (ajuste contable de emergencia) */
+    const [modalEditar,   setModalEditar]   = useState(false);
+    const [modalEliminar, setModalEliminar] = useState({ visible: false, anio: null, mes: null, cuentaId: null });
+    const [formEditar,    setFormEditar]    = useState({
+        ANIO: '', MES: '', CUENTA_ID: '', NOMBRE_CUENTA: '',
+        SALDO_DEUDOR: 0, SALDO_ACREEDOR: 0, AJUSTE_DEBE: 0, AJUSTE_HABER: 0
+    });
 
     const mostrarMensaje = (texto, tipo) => {
         setMensaje({ texto, tipo });
-        setTimeout(() => setMensaje({ texto: '', tipo: '' }), 3500);
+        setTimeout(() => setMensaje({ texto: '', tipo: '' }), 4000);
     };
 
-    const cargarSaldos = async () => {
+    /* ── Generar hoja por período (flujo principal) ───────────────────── */
+    const handleGenerarHoja = async () => {
+        if (!filtro.ANIO || !filtro.MES) {
+            mostrarMensaje('⚠️ Seleccione un Año y un Mes para consolidar el reporte.', 'advertencia');
+            return;
+        }
         try {
-            const res = await hojaTrabajoService.getAll();
-            setSaldos(res.data);
-        } catch (err) { mostrarMensaje('Error al cargar saldos', 'error'); }
+            setCargando(true);
+            setSinDatos(false);
+            setSaldos([]);
+
+            const res   = await hojaTrabajoService.getByPeriodo(Number(filtro.ANIO), Number(filtro.MES));
+            const datos = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : []);
+
+            setSaldos(datos);
+            setGenerado(true);
+            setSinDatos(datos.length === 0);
+
+            const mesLabel = MESES.find(m => m.value === Number(filtro.MES))?.label ?? filtro.MES;
+            setPeriodoLabel(`${mesLabel} ${filtro.ANIO}`);
+
+            if (datos.length > 0) {
+                mostrarMensaje(`✅ Hoja consolidada: ${datos.length} cuenta(s) del período ${mesLabel} ${filtro.ANIO}.`, 'exito');
+            }
+        } catch (err) {
+            console.error('Error al generar hoja:', err);
+            mostrarMensaje('🚨 Error al conectar con Oracle. Verifique el servidor.', 'error');
+            setSinDatos(true);
+        } finally {
+            setCargando(false);
+        }
     };
 
-    const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
-    const handleChangeEditar = (e) => setFormEditar({ ...formEditar, [e.target.name]: e.target.value });
+    const handleRestablecer = () => {
+        setSaldos([]);
+        setGenerado(false);
+        setSinDatos(false);
+        setFiltro({ ANIO: '', MES: '' });
+        setPeriodoLabel('');
+    };
 
-    const handleCrear = async () => {
+    const handleChangeFiltro = (e) => {
+        const val = e.target.value === '' ? '' : Number(e.target.value);
+        setFiltro(prev => ({ ...prev, [e.target.name]: val }));
+    };
+
+    /* ── CRUD de ajuste manual (persiste en tabla caché + auditoría) ──── */
+    const handleAbrirEditar = (s) => {
+        setFormEditar({ ...s });
+        setModalEditar(true);
+    };
+
+    const handleGuardarAjuste = async () => {
         try {
-            await hojaTrabajoService.create(form, usuario.USER_ID);
-            mostrarMensaje('Saldo creado correctamente', 'exito');
-            cargarSaldos();
-        } catch (err) { mostrarMensaje('Error al crear saldo', 'error'); }
+            await hojaTrabajoService.update(
+                formEditar.ANIO, formEditar.MES, formEditar.CUENTA_ID,
+                formEditar, usuario.USER_ID
+            );
+            setModalEditar(false);
+            mostrarMensaje('Ajuste guardado y auditado correctamente.', 'exito');
+            /* Recarga el período actual para reflejar el cambio */
+            handleGenerarHoja();
+        } catch (err) { mostrarMensaje('Error al guardar ajuste', 'error'); }
     };
 
-    const confirmarEliminar = (anio, mes, cuentaId) => setModalEliminar({ visible: true, anio, mes, cuentaId });
+    const confirmarEliminar = (anio, mes, cuentaId) =>
+        setModalEliminar({ visible: true, anio, mes, cuentaId });
 
     const handleEliminar = async () => {
         try {
-            await hojaTrabajoService.delete(modalEliminar.anio, modalEliminar.mes, modalEliminar.cuentaId, usuario.USER_ID);
+            await hojaTrabajoService.delete(
+                modalEliminar.anio, modalEliminar.mes, modalEliminar.cuentaId, usuario.USER_ID
+            );
             setModalEliminar({ visible: false, anio: null, mes: null, cuentaId: null });
-            mostrarMensaje('Saldo eliminado correctamente', 'exito');
-            cargarSaldos();
-        } catch (err) { mostrarMensaje('Error al eliminar saldo', 'error'); }
+            mostrarMensaje('Registro eliminado de la caché.', 'exito');
+            handleGenerarHoja();
+        } catch (err) { mostrarMensaje('Error al eliminar registro', 'error'); }
     };
 
-    const handleAbrirModal = (s) => {
-        setFormEditar({ ...s });
-        setModalVisible(true);
+    /* ── Exportar Excel ──────────────────────────────────────────────── */
+    const exportarExcel = () => {
+        if (!tablaRef.current) return;
+        const html  = `<html><head><meta charset="UTF-8">
+            <style>
+                table{border-collapse:collapse;font-family:Arial,sans-serif;font-size:9px}
+                th,td{border:1px solid #888;padding:3px 7px}
+                th{background:#1E3A5F;color:white}
+            </style></head><body>${tablaRef.current.outerHTML}</body></html>`;
+        const blob  = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+        const url   = URL.createObjectURL(blob);
+        const a     = document.createElement('a');
+        a.href      = url;
+        a.download  = `HojaTrabajo_${filtro.ANIO}_${filtro.MES}.xls`;
+        a.click();
+        URL.revokeObjectURL(url);
     };
 
-    const handleActualizar = async () => {
-        try {
-            await hojaTrabajoService.update(formEditar.ANIO, formEditar.MES, formEditar.CUENTA_ID, formEditar, usuario.USER_ID);
-            setModalVisible(false);
-            mostrarMensaje('Saldo actualizado correctamente', 'exito');
-            cargarSaldos();
-        } catch (err) { mostrarMensaje('Error al actualizar saldo', 'error'); }
+    /* ── Exportar PDF ────────────────────────────────────────────────── */
+    const exportarPDF = () => {
+        const prev = document.getElementById('_ht_print_styles');
+        if (prev) prev.remove();
+        const style = document.createElement('style');
+        style.id    = '_ht_print_styles';
+        style.textContent = `
+            @media print {
+                @page { size: A3 landscape; margin: 8mm; }
+                body * { visibility: hidden !important; }
+                .seccion-reporte, .seccion-reporte * { visibility: visible !important; }
+                .seccion-reporte { position: absolute; inset: 0; font-size: 8px; font-family: Arial, sans-serif; }
+                .seccion-reporte table { border-collapse: collapse; width: 100%; }
+                .seccion-reporte th, .seccion-reporte td { border: 1px solid #999; padding: 2px 4px; }
+                .seccion-reporte th { background: #1E3A5F !important; color: white !important;
+                    -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                .no-print { display: none !important; }
+            }`;
+        document.head.appendChild(style);
+        window.print();
     };
 
-    const inputClass = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1E3A5F] focus:border-transparent";
-    const labelClass = "block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide";
+    /* ── Estilos comunes ─────────────────────────────────────────────── */
+    const inputClass  = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1E3A5F] focus:border-transparent";
+    const labelClass  = "block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide";
+    const selectClass = "border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#1E3A5F]";
 
+    /* ── Cálculos agregados para el pie de página ────────────────────── */
+    const totales = saldos.reduce((acc, s) => {
+        const f = calcularFila(s);
+        return {
+            d:  acc.d  + f.d,  a:   acc.a   + f.a,
+            ad: acc.ad + f.ad, ah:  acc.ah  + f.ah,
+            s5: acc.s5 + f.sajD, s6: acc.s6 + f.sajA,
+            s7: acc.s7 + f.perdida, s8: acc.s8 + f.ganancia,
+            s9: acc.s9 + f.activo, s10: acc.s10 + f.pasPat,
+        };
+    }, { d:0, a:0, ad:0, ah:0, s5:0, s6:0, s7:0, s8:0, s9:0, s10:0 });
+
+    const utilResultados = totales.s8 - totales.s7;  // + = Utilidad, - = Pérdida
+    const utilBalance    = totales.s9 - totales.s10;  // + = Activos > Pas+Pat → descuadre → se carga a Pas+Pat
+
+    const balanzaDescuadrada = Math.abs(totales.d - totales.a) > 0.01;
+
+    /* ── RENDER ──────────────────────────────────────────────────────── */
     return (
         <div className="min-h-screen bg-gray-50">
             <Toast mensaje={mensaje} />
-            <header className="bg-[#1E3A5F] text-white px-8 py-5 shadow-lg">
-                <div className="max-w-7xl mx-auto flex items-center justify-between">
+
+            {/* HEADER */}
+            <header className="bg-[#1E3A5F] text-white px-8 py-5 shadow-lg no-print">
+                <div className="max-w-[1400px] mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <span className="text-2xl">📊</span>
                         <div>
-                            <h1 className="text-2xl font-bold tracking-wide">Hoja de Trabajo Saldos</h1>
-                            <p className="text-blue-200 text-sm">Caché de las 12 columnas contables</p>
+                            <h1 className="text-2xl font-bold tracking-wide">Hoja de Trabajo</h1>
+                            <p className="text-blue-200 text-sm">
+                                Motor analítico de 10 columnas · Consolidación automática desde pólizas Oracle
+                            </p>
                         </div>
                     </div>
-                    <button onClick={() => navigate('/')} className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all">← Regresar</button>
+                    <button
+                        onClick={() => navigate('/')}
+                        className="flex items-center gap-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm font-medium transition-all">
+                        ← Regresar
+                    </button>
                 </div>
             </header>
-            <main className="max-w-7xl mx-auto px-8 py-8">
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
-                    <h2 className="text-[#1E3A5F] font-bold text-lg mb-5 pb-3 border-b border-gray-100">Nuevo Saldo</h2>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div><label className={labelClass}>Año</label><input name="ANIO" className={inputClass} placeholder="Ej. 2025" onChange={handleChange} /></div>
-                        <div><label className={labelClass}>Mes</label><input name="MES" className={inputClass} placeholder="Ej. 1" onChange={handleChange} /></div>
-                        <div><label className={labelClass}>ID Cuenta</label><input name="CUENTA_ID" className={inputClass} placeholder="Ej. 101" onChange={handleChange} /></div>
-                        <div><label className={labelClass}>Saldo Deudor</label><input name="SALDO_DEUDOR" className={inputClass} placeholder="0.00" type="number" onChange={handleChange} /></div>
-                        <div><label className={labelClass}>Saldo Acreedor</label><input name="SALDO_ACREEDOR" className={inputClass} placeholder="0.00" type="number" onChange={handleChange} /></div>
-                        <div><label className={labelClass}>Ajuste Debe</label><input name="AJUSTE_DEBE" className={inputClass} placeholder="0.00" type="number" onChange={handleChange} /></div>
-                        <div><label className={labelClass}>Ajuste Haber</label><input name="AJUSTE_HABER" className={inputClass} placeholder="0.00" type="number" onChange={handleChange} /></div>
-                    </div>
-                    <div className="mt-5"><button onClick={handleCrear} className="bg-[#1E3A5F] hover:bg-[#2a4f7c] text-white px-6 py-2 rounded-lg text-sm font-semibold transition-all shadow-sm">+ Crear Saldo</button></div>
-                </div>
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div className="px-6 py-4 border-b border-gray-100">
-                        <h2 className="text-[#1E3A5F] font-bold text-lg">Saldos Registrados</h2>
-                        <p className="text-gray-400 text-sm">{saldos.length} registro(s) encontrado(s)</p>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="bg-[#1E3A5F] text-white">
-                                    <th className="px-4 py-3 text-left font-semibold">Año</th>
-                                    <th className="px-4 py-3 text-left font-semibold">Mes</th>
-                                    <th className="px-4 py-3 text-left font-semibold">ID Cuenta</th>
-                                    <th className="px-4 py-3 text-left font-semibold">Nombre Cuenta</th>
-                                    <th className="px-4 py-3 text-right font-semibold">Saldo Deudor</th>
-                                    <th className="px-4 py-3 text-right font-semibold">Saldo Acreedor</th>
-                                    <th className="px-4 py-3 text-right font-semibold">Ajuste Debe</th>
-                                    <th className="px-4 py-3 text-right font-semibold">Ajuste Haber</th>
-                                    <th className="px-4 py-3 text-center font-semibold">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {saldos.map((s, index) => (
-                                    <tr key={`${s.ANIO}-${s.MES}-${s.CUENTA_ID}`} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                                        <td className="px-4 py-3 font-mono text-gray-600">{s.ANIO}</td>
-                                        <td className="px-4 py-3 text-gray-600">{s.MES}</td>
-                                        <td className="px-4 py-3 text-gray-600">{s.CUENTA_ID}</td>
-                                        <td className="px-4 py-3 font-medium text-gray-800">{s.NOMBRE_CUENTA}</td>
-                                        <td className="px-4 py-3 text-right font-mono text-gray-700">{s.SALDO_DEUDOR}</td>
-                                        <td className="px-4 py-3 text-right font-mono text-gray-700">{s.SALDO_ACREEDOR}</td>
-                                        <td className="px-4 py-3 text-right font-mono text-gray-700">{s.AJUSTE_DEBE}</td>
-                                        <td className="px-4 py-3 text-right font-mono text-gray-700">{s.AJUSTE_HABER}</td>
-                                        <td className="px-4 py-3 text-center">
-                                            <button onClick={() => handleAbrirModal(s)} className="bg-[#2E75B6] hover:bg-[#1E3A5F] text-white px-3 py-1 rounded-lg text-xs font-medium mr-2 transition-all">Editar</button>
-                                            <button onClick={() => confirmarEliminar(s.ANIO, s.MES, s.CUENTA_ID)} className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg text-xs font-medium transition-all">Eliminar</button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </main>
-            {modalVisible && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4">
-                        <div className="bg-[#1E3A5F] text-white px-6 py-4 rounded-t-xl flex items-center justify-between">
-                            <h3 className="font-bold text-lg">Editar Saldo</h3>
-                            <button onClick={() => setModalVisible(false)} className="text-white/70 hover:text-white text-xl">✕</button>
+
+            <main className="max-w-[1400px] mx-auto px-6 py-7">
+
+                {/* ── PANEL DE GENERACIÓN ──────────────────────────────── */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-5 no-print">
+                    <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+                        <span className="text-lg">🗓️</span>
+                        <div>
+                            <h2 className="text-[#1E3A5F] font-bold text-base">Generar Hoja de Trabajo</h2>
+                            <p className="text-gray-400 text-xs">
+                                Seleccione el período contable. El sistema consolidará automáticamente
+                                todas las pólizas autorizadas desde Oracle.
+                            </p>
                         </div>
-                        <div className="p-6 grid grid-cols-2 gap-4">
-                            <div><label className={labelClass}>Año</label><p className="text-gray-500 text-sm font-mono bg-gray-50 px-3 py-2 rounded-lg">{formEditar.ANIO}</p></div>
-                            <div><label className={labelClass}>Mes</label><p className="text-gray-500 text-sm font-mono bg-gray-50 px-3 py-2 rounded-lg">{formEditar.MES}</p></div>
-                            <div><label className={labelClass}>ID Cuenta</label><p className="text-gray-500 text-sm font-mono bg-gray-50 px-3 py-2 rounded-lg">{formEditar.CUENTA_ID}</p></div>
-                            <div><label className={labelClass}>Saldo Deudor</label><input name="SALDO_DEUDOR" value={formEditar.SALDO_DEUDOR} type="number" onChange={handleChangeEditar} className={inputClass} /></div>
-                            <div><label className={labelClass}>Saldo Acreedor</label><input name="SALDO_ACREEDOR" value={formEditar.SALDO_ACREEDOR} type="number" onChange={handleChangeEditar} className={inputClass} /></div>
-                            <div><label className={labelClass}>Ajuste Debe</label><input name="AJUSTE_DEBE" value={formEditar.AJUSTE_DEBE} type="number" onChange={handleChangeEditar} className={inputClass} /></div>
-                            <div><label className={labelClass}>Ajuste Haber</label><input name="AJUSTE_HABER" value={formEditar.AJUSTE_HABER} type="number" onChange={handleChangeEditar} className={inputClass} /></div>
+                    </div>
+                    <div className="flex flex-wrap items-end gap-4">
+                        <div>
+                            <label className={labelClass}>Año</label>
+                            <select name="ANIO" value={filtro.ANIO} onChange={handleChangeFiltro} className={selectClass}>
+                                <option value="">— Año —</option>
+                                {ANIOS.map(a => <option key={a} value={a}>{a}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className={labelClass}>Mes</label>
+                            <select name="MES" value={filtro.MES} onChange={handleChangeFiltro} className={selectClass}>
+                                <option value="">— Mes —</option>
+                                {MESES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                            </select>
+                        </div>
+                        <button
+                            onClick={handleGenerarHoja}
+                            disabled={cargando}
+                            className="flex items-center gap-2 bg-[#1E3A5F] hover:bg-[#2a4f7c] disabled:opacity-60 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg text-sm font-semibold transition-all shadow-sm">
+                            {cargando
+                                ? <><span className="animate-spin">⏳</span> Consolidando...</>
+                                : '🔍 Generar Hoja de Trabajo'}
+                        </button>
+                        {generado && (
+                            <button
+                                onClick={handleRestablecer}
+                                className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-5 py-2 rounded-lg text-sm font-semibold transition-all border border-gray-300">
+                                🔄 Nuevo período
+                            </button>
+                        )}
+                        {generado && periodoLabel && (
+                            <span className="text-xs bg-blue-50 border border-blue-200 text-blue-700 px-3 py-1.5 rounded-lg font-semibold">
+                                📅 {periodoLabel}
+                            </span>
+                        )}
+                    </div>
+                </div>
+
+                {/* ── AVISO SIN DATOS ──────────────────────────────────── */}
+                {sinDatos && !cargando && (
+                    <div className="bg-amber-50 border border-amber-300 text-amber-800 rounded-xl px-5 py-4 mb-5 text-sm font-medium no-print">
+                        💡 No se encontraron movimientos contables autorizados en Oracle para el período seleccionado.
+                        Verifique que existan pólizas con estado <strong>AUTORIZADA</strong> en ese mes y año.
+                    </div>
+                )}
+
+                {/* ── AVISO DESCUADRE ───────────────────────────────────── */}
+                {generado && !sinDatos && balanzaDescuadrada && (
+                    <div className="bg-red-50 border border-red-400 text-red-700 rounded-xl px-5 py-4 mb-5 text-sm font-semibold no-print">
+                        🚨 Error de Integridad: La Balanza de Comprobación inicial se encuentra descuadrada.
+                        El total Deudor ({fmtSum(totales.d)}) no coincide con el total Acreedor ({fmtSum(totales.a)}).
+                        Revise las pólizas capturadas en Oracle.
+                    </div>
+                )}
+
+                {/* ── TABLA PRINCIPAL ──────────────────────────────────── */}
+                {(generado || saldos.length > 0) && (
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden seccion-reporte">
+
+                        {/* Toolbar */}
+                        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3 no-print">
+                            <div>
+                                <h2 className="text-[#1E3A5F] font-bold text-base">
+                                    Hoja de Trabajo Analítica
+                                    {periodoLabel && <span className="ml-2 text-sm font-normal text-gray-400">— {periodoLabel}</span>}
+                                </h2>
+                                <p className="text-gray-400 text-xs mt-0.5">{saldos.length} cuenta(s) · Columnas 1–10 calculadas automáticamente</p>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={exportarExcel}
+                                    className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-xs font-semibold transition-all shadow-sm">
+                                    🟢 Exportar Excel
+                                </button>
+                                <button onClick={exportarPDF}
+                                    className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-xs font-semibold transition-all shadow-sm">
+                                    🔴 Exportar PDF
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                            <table ref={tablaRef} className="w-full text-[11px] border-collapse">
+                                <thead>
+                                    {/* Fila 1: agrupadores */}
+                                    <tr className="bg-[#1E3A5F] text-white">
+                                        <th colSpan={4} className="px-3 py-2 text-left border-r border-blue-800 uppercase tracking-wider font-bold text-[10px]">Datos de la Cuenta</th>
+                                        <th colSpan={2} className="px-3 py-2 text-center border-r border-blue-800 uppercase tracking-wider font-bold text-[10px] bg-[#163059]">1–2: Balanza Saldos</th>
+                                        <th colSpan={2} className="px-3 py-2 text-center border-r border-blue-800 uppercase tracking-wider font-bold text-[10px] bg-[#1E3A5F]">3–4: Ajustes Período</th>
+                                        <th colSpan={2} className="px-3 py-2 text-center border-r border-blue-800 uppercase tracking-wider font-bold text-[10px] bg-[#163059]">5–6: Saldos Ajustados</th>
+                                        <th colSpan={2} className="px-3 py-2 text-center border-r border-blue-800 uppercase tracking-wider font-bold text-[10px] bg-[#1E3A5F]">7–8: Est. Resultados</th>
+                                        <th colSpan={2} className="px-3 py-2 text-center border-r border-blue-800 uppercase tracking-wider font-bold text-[10px] bg-[#163059]">9–10: Balance General</th>
+                                        <th rowSpan={2} className="px-3 py-2 text-center font-bold uppercase text-[10px] tracking-wider no-print">Acciones</th>
+                                    </tr>
+                                    {/* Fila 2: columnas individuales */}
+                                    <tr className="bg-[#2a4f7c] text-white text-[10px]">
+                                        <th className="px-2 py-1.5 text-center font-semibold border-r border-blue-700 w-10">Año</th>
+                                        <th className="px-2 py-1.5 text-center font-semibold border-r border-blue-700 w-8">Mes</th>
+                                        <th className="px-2 py-1.5 text-left  font-semibold border-r border-blue-700 w-16">Código</th>
+                                        <th className="px-2 py-1.5 text-left  font-semibold border-r border-blue-700 min-w-[120px]">Nombre Cuenta</th>
+                                        {/* 1-2 */}
+                                        <th className="px-2 py-1.5 text-right font-semibold border-r border-blue-700 bg-[#163059]/60 w-20">Deudor</th>
+                                        <th className="px-2 py-1.5 text-right font-semibold border-r border-blue-700 bg-[#163059]/60 w-20">Acreedor</th>
+                                        {/* 3-4 */}
+                                        <th className="px-2 py-1.5 text-right font-semibold border-r border-blue-700 w-20">Debe</th>
+                                        <th className="px-2 py-1.5 text-right font-semibold border-r border-blue-700 w-20">Haber</th>
+                                        {/* 5-6 */}
+                                        <th className="px-2 py-1.5 text-right font-semibold border-r border-blue-700 bg-[#163059]/60 w-20">Deudor</th>
+                                        <th className="px-2 py-1.5 text-right font-semibold border-r border-blue-700 bg-[#163059]/60 w-20">Acreedor</th>
+                                        {/* 7-8 */}
+                                        <th className="px-2 py-1.5 text-right font-semibold border-r border-blue-700 w-20">Pérdida</th>
+                                        <th className="px-2 py-1.5 text-right font-semibold border-r border-blue-700 w-20">Ganancia</th>
+                                        {/* 9-10 */}
+                                        <th className="px-2 py-1.5 text-right font-semibold border-r border-blue-700 bg-[#163059]/60 w-20">Activo</th>
+                                        <th className="px-2 py-1.5 text-right font-semibold border-r border-blue-700 bg-[#163059]/60 w-20">Pas+Pat</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody>
+                                    {/* Filas de datos */}
+                                    {saldos.map((s, i) => {
+                                        const f = calcularFila(s);
+                                        return (
+                                            <tr key={`${s.ANIO}-${s.MES}-${s.CUENTA_ID}`}
+                                                className={`border-b border-gray-200 hover:bg-blue-50/30 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}`}>
+                                                <td className="px-2 py-1.5 text-center font-mono text-gray-500">{s.ANIO}</td>
+                                                <td className="px-2 py-1.5 text-center text-gray-600">{s.MES}</td>
+                                                <td className="px-2 py-1.5 text-left  font-mono font-semibold text-gray-600 border-r border-gray-100">{s.CUENTA_ID}</td>
+                                                <td className="px-2 py-1.5 text-left  font-medium text-gray-800 border-r border-gray-100 max-w-[160px] truncate" title={s.NOMBRE_CUENTA}>{s.NOMBRE_CUENTA}</td>
+                                                {/* 1-2 */}
+                                                <td className="px-2 py-1.5 text-right font-mono text-gray-700 bg-slate-50/60">{fmt(f.d)}</td>
+                                                <td className="px-2 py-1.5 text-right font-mono text-gray-700 bg-slate-50/60 border-r border-gray-100">{fmt(f.a)}</td>
+                                                {/* 3-4 */}
+                                                <td className="px-2 py-1.5 text-right font-mono text-gray-700">{fmt(f.ad)}</td>
+                                                <td className="px-2 py-1.5 text-right font-mono text-gray-700 border-r border-gray-100">{fmt(f.ah)}</td>
+                                                {/* 5-6 */}
+                                                <td className="px-2 py-1.5 text-right font-mono font-medium text-gray-900 bg-slate-50/60">{fmt(f.sajD)}</td>
+                                                <td className="px-2 py-1.5 text-right font-mono font-medium text-gray-900 bg-slate-50/60 border-r border-gray-100">{fmt(f.sajA)}</td>
+                                                {/* 7-8 */}
+                                                <td className="px-2 py-1.5 text-right font-mono text-red-600">{fmt(f.perdida)}</td>
+                                                <td className="px-2 py-1.5 text-right font-mono text-green-700 border-r border-gray-100">{fmt(f.ganancia)}</td>
+                                                {/* 9-10 */}
+                                                <td className="px-2 py-1.5 text-right font-mono text-blue-700 bg-slate-50/60">{fmt(f.activo)}</td>
+                                                <td className="px-2 py-1.5 text-right font-mono text-blue-900 bg-slate-50/60 border-r border-gray-100">{fmt(f.pasPat)}</td>
+                                                {/* Acciones */}
+                                                <td className="px-2 py-1.5 text-center whitespace-nowrap no-print">
+                                                    <button onClick={() => handleAbrirEditar(s)}
+                                                        className="bg-[#2E75B6] hover:bg-[#1E3A5F] text-white px-2 py-0.5 rounded text-[10px] font-medium mr-1 transition-all">
+                                                        Ajustar
+                                                    </button>
+                                                    <button onClick={() => confirmarEliminar(s.ANIO, s.MES, s.CUENTA_ID)}
+                                                        className="bg-red-500 hover:bg-red-600 text-white px-2 py-0.5 rounded text-[10px] font-medium transition-all">
+                                                        ✕
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+
+                                    {/* Fila vacía si sin datos pero ya se intentó generar */}
+                                    {sinDatos && (
+                                        <tr>
+                                            <td colSpan={15} className="px-4 py-8 text-center text-gray-400 text-xs italic">
+                                                Sin registros para este período.
+                                            </td>
+                                        </tr>
+                                    )}
+
+                                    {/* ── PIE DE PÁGINA: 3 filas de cierre contable ──────── */}
+
+                                    {/* FILA 1: SUBTOTALES */}
+                                    <tr className={`font-bold border-t-2 border-gray-400 text-[10px] ${balanzaDescuadrada ? 'bg-red-100' : 'bg-gray-100'}`}>
+                                        <td colSpan={4} className="px-3 py-2 text-center text-gray-700 uppercase tracking-widest font-bold">
+                                            Subtotales
+                                            {balanzaDescuadrada && <span className="ml-2 text-red-600 text-[9px] not-italic">⚠ Descuadre</span>}
+                                        </td>
+                                        <td className="px-2 py-2 text-right font-mono">{fmtSum(totales.d)}</td>
+                                        <td className="px-2 py-2 text-right font-mono border-r border-gray-300">{fmtSum(totales.a)}</td>
+                                        <td className="px-2 py-2 text-right font-mono">{fmtSum(totales.ad)}</td>
+                                        <td className="px-2 py-2 text-right font-mono border-r border-gray-300">{fmtSum(totales.ah)}</td>
+                                        <td className="px-2 py-2 text-right font-mono">{fmtSum(totales.s5)}</td>
+                                        <td className="px-2 py-2 text-right font-mono border-r border-gray-300">{fmtSum(totales.s6)}</td>
+                                        <td className="px-2 py-2 text-right font-mono text-red-700">{fmtSum(totales.s7)}</td>
+                                        <td className="px-2 py-2 text-right font-mono text-green-700 border-r border-gray-300">{fmtSum(totales.s8)}</td>
+                                        <td className="px-2 py-2 text-right font-mono text-blue-700">{fmtSum(totales.s9)}</td>
+                                        <td className="px-2 py-2 text-right font-mono text-blue-900 border-r border-gray-300">{fmtSum(totales.s10)}</td>
+                                        <td className="bg-white no-print"></td>
+                                    </tr>
+
+                                    {/* FILA 2: RESULTADO DEL EJERCICIO */}
+                                    <tr className="bg-amber-50 text-[10px] font-semibold italic border-b border-gray-300">
+                                        <td colSpan={4} className="px-3 py-1.5 text-center uppercase tracking-widest text-amber-800 font-bold not-italic">
+                                            {utilResultados >= 0
+                                                ? '✦ Utilidad del Ejercicio'
+                                                : '✦ Pérdida del Ejercicio'}
+                                        </td>
+                                        {/* Columnas 1-2: vacías */}
+                                        <td className="border-r border-gray-200 bg-gray-50"></td>
+                                        <td className="border-r border-gray-200 bg-gray-50"></td>
+                                        {/* Columnas 3-4: vacías */}
+                                        <td className="border-r border-gray-200"></td>
+                                        <td className="border-r border-gray-200"></td>
+                                        {/* Columnas 5-6: vacías */}
+                                        <td className="border-r border-gray-200 bg-gray-50"></td>
+                                        <td className="border-r border-gray-200 bg-gray-50"></td>
+                                        {/* Columnas 7-8: cuadre de resultados */}
+                                        <td className="px-2 py-1.5 text-right font-mono text-red-700 not-italic">
+                                            {/* Si hay utilidad → la pérdida necesita aumentar para igualar */}
+                                            {utilResultados > 0 ? fmtSum(utilResultados) : '—'}
+                                        </td>
+                                        <td className="px-2 py-1.5 text-right font-mono text-green-700 border-r border-gray-300 not-italic">
+                                            {utilResultados < 0 ? fmtSum(Math.abs(utilResultados)) : '—'}
+                                        </td>
+                                        {/* Columnas 9-10: cuadre de balance */}
+                                        <td className="px-2 py-1.5 text-right font-mono text-blue-700 not-italic">
+                                            {utilBalance < 0 ? fmtSum(Math.abs(utilBalance)) : '—'}
+                                        </td>
+                                        <td className="px-2 py-1.5 text-right font-mono text-blue-900 border-r border-gray-300 not-italic">
+                                            {utilBalance > 0 ? fmtSum(utilBalance) : '—'}
+                                        </td>
+                                        <td className="bg-white no-print"></td>
+                                    </tr>
+
+                                    {/* FILA 3: SUMAS IGUALES (totales cuadrados) */}
+                                    <tr className="bg-[#1E3A5F] text-white font-bold text-[10px]">
+                                        <td colSpan={4} className="px-3 py-2.5 text-center uppercase tracking-[0.15em]">Sumas Iguales</td>
+                                        <td className="px-2 py-2.5 text-right font-mono">{fmtSum(totales.d)}</td>
+                                        <td className="px-2 py-2.5 text-right font-mono border-r border-blue-700">{fmtSum(totales.a)}</td>
+                                        <td className="px-2 py-2.5 text-right font-mono">{fmtSum(totales.ad)}</td>
+                                        <td className="px-2 py-2.5 text-right font-mono border-r border-blue-700">{fmtSum(totales.ah)}</td>
+                                        <td className="px-2 py-2.5 text-right font-mono">{fmtSum(totales.s5)}</td>
+                                        <td className="px-2 py-2.5 text-right font-mono border-r border-blue-700">{fmtSum(totales.s6)}</td>
+                                        {/* Resultados cuadrados: subtotal + resultado del ejercicio */}
+                                        <td className="px-2 py-2.5 text-right font-mono bg-[#163059]">
+                                            {fmtSum(utilResultados > 0 ? totales.s7 + utilResultados : totales.s7)}
+                                        </td>
+                                        <td className="px-2 py-2.5 text-right font-mono border-r border-blue-700 bg-[#163059]">
+                                            {fmtSum(utilResultados < 0 ? totales.s8 + Math.abs(utilResultados) : totales.s8)}
+                                        </td>
+                                        {/* Balance cuadrado */}
+                                        <td className="px-2 py-2.5 text-right font-mono bg-[#122947]">
+                                            {fmtSum(utilBalance < 0 ? totales.s9 + Math.abs(utilBalance) : totales.s9)}
+                                        </td>
+                                        <td className="px-2 py-2.5 text-right font-mono border-r border-blue-700 bg-[#122947]">
+                                            {fmtSum(utilBalance > 0 ? totales.s10 + utilBalance : totales.s10)}
+                                        </td>
+                                        <td className="bg-[#1E3A5F] no-print"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+
+                {/* Estado inicial (antes de generar) */}
+                {!generado && !cargando && (
+                    <div className="bg-white rounded-xl border border-dashed border-gray-300 py-16 text-center text-gray-400">
+                        <div className="text-5xl mb-3">📋</div>
+                        <p className="text-sm font-medium">Seleccione un período y presione <strong>Generar Hoja de Trabajo</strong></p>
+                        <p className="text-xs mt-1">El sistema consolidará automáticamente las pólizas autorizadas desde Oracle.</p>
+                    </div>
+                )}
+
+            </main>
+
+            {/* ── MODAL: AJUSTE MANUAL ─────────────────────────────────── */}
+            {modalEditar && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 no-print">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
+                        <div className="bg-[#1E3A5F] text-white px-6 py-4 rounded-t-xl flex items-center justify-between">
+                            <div>
+                                <h3 className="font-bold text-base">Ajuste Manual de Saldo</h3>
+                                <p className="text-blue-200 text-xs">Los cambios se auditarán en Oracle automáticamente.</p>
+                            </div>
+                            <button onClick={() => setModalEditar(false)} className="text-white/70 hover:text-white text-xl">✕</button>
+                        </div>
+                        <div className="p-6">
+                            {/* Info de la cuenta (solo lectura) */}
+                            <div className="bg-gray-50 rounded-lg p-3 mb-4 text-xs text-gray-600 grid grid-cols-3 gap-2">
+                                <div><span className="font-semibold block uppercase tracking-wide text-gray-400">Año</span>{formEditar.ANIO}</div>
+                                <div><span className="font-semibold block uppercase tracking-wide text-gray-400">Mes</span>{formEditar.MES}</div>
+                                <div><span className="font-semibold block uppercase tracking-wide text-gray-400">Código</span>{formEditar.CUENTA_ID}</div>
+                                <div className="col-span-3"><span className="font-semibold block uppercase tracking-wide text-gray-400">Cuenta</span>{formEditar.NOMBRE_CUENTA}</div>
+                            </div>
+                            {/* Campos editables */}
+                            <div className="grid grid-cols-2 gap-3">
+                                {[
+                                    ['SALDO_DEUDOR', 'Saldo Deudor'],
+                                    ['SALDO_ACREEDOR', 'Saldo Acreedor'],
+                                    ['AJUSTE_DEBE', 'Ajuste Debe'],
+                                    ['AJUSTE_HABER', 'Ajuste Haber'],
+                                ].map(([name, label]) => (
+                                    <div key={name}>
+                                        <label className={labelClass}>{label}</label>
+                                        <input
+                                            name={name}
+                                            type="number"
+                                            step="0.01"
+                                            value={formEditar[name]}
+                                            onChange={e => setFormEditar(prev => ({ ...prev, [name]: e.target.value }))}
+                                            className={inputClass}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                         <div className="px-6 pb-6 flex gap-3 justify-end">
-                            <button onClick={() => setModalVisible(false)} className="px-5 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-all">Cancelar</button>
-                            <button onClick={handleActualizar} className="px-5 py-2 rounded-lg bg-[#1E3A5F] hover:bg-[#2a4f7c] text-white text-sm font-semibold transition-all">Guardar cambios</button>
+                            <button onClick={() => setModalEditar(false)}
+                                className="px-5 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-all">
+                                Cancelar
+                            </button>
+                            <button onClick={handleGuardarAjuste}
+                                className="px-5 py-2 rounded-lg bg-[#1E3A5F] hover:bg-[#2a4f7c] text-white text-sm font-semibold transition-all">
+                                Guardar Ajuste
+                            </button>
                         </div>
                     </div>
                 </div>
             )}
+
+            {/* ── MODAL: CONFIRMAR ELIMINAR ────────────────────────────── */}
             {modalEliminar.visible && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4">
-                        <div className="p-6 text-center">
-                            <span className="text-5xl mb-4 block">⚠️</span>
-                            <h3 className="text-gray-800 font-bold text-lg mb-2">¿Eliminar registro?</h3>
-                            <p className="text-gray-500 text-sm mb-6">Esta acción no se puede deshacer.</p>
-                            <div className="flex gap-3 justify-center">
-                                <button onClick={() => setModalEliminar({ visible: false, anio: null, mes: null, cuentaId: null })} className="px-5 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-all">Cancelar</button>
-                                <button onClick={handleEliminar} className="px-5 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-all">Sí, eliminar</button>
-                            </div>
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 no-print">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6 text-center">
+                        <span className="text-5xl mb-4 block">⚠️</span>
+                        <h3 className="text-gray-800 font-bold text-lg mb-2">¿Eliminar registro de caché?</h3>
+                        <p className="text-gray-500 text-sm mb-6">
+                            Solo se elimina el ajuste manual almacenado. Las pólizas originales en Oracle no se modifican.
+                        </p>
+                        <div className="flex gap-3 justify-center">
+                            <button
+                                onClick={() => setModalEliminar({ visible: false, anio: null, mes: null, cuentaId: null })}
+                                className="px-5 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-all">
+                                Cancelar
+                            </button>
+                            <button onClick={handleEliminar}
+                                className="px-5 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-all">
+                                Sí, eliminar
+                            </button>
                         </div>
                     </div>
                 </div>
