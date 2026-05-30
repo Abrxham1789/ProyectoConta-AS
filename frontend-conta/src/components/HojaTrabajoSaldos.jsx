@@ -335,7 +335,6 @@ function HojaTrabajoSaldos() {
                                         <th colSpan={2} className="px-3 py-2 text-center border-r border-blue-800 uppercase tracking-wider font-bold text-[10px] bg-[#163059]">5–6: Saldos Ajustados</th>
                                         <th colSpan={2} className="px-3 py-2 text-center border-r border-blue-800 uppercase tracking-wider font-bold text-[10px] bg-[#1E3A5F]">7–8: Est. Resultados</th>
                                         <th colSpan={2} className="px-3 py-2 text-center border-r border-blue-800 uppercase tracking-wider font-bold text-[10px] bg-[#163059]">9–10: Balance General</th>
-                                        <th rowSpan={2} className="px-3 py-2 text-center font-bold uppercase text-[10px] tracking-wider no-print">Acciones</th>
                                     </tr>
                                     <tr className="bg-[#2a4f7c] text-white text-[10px]">
                                         <th className="px-2 py-1.5 text-center font-semibold border-r border-blue-700 w-10">Año</th>
@@ -374,10 +373,6 @@ function HojaTrabajoSaldos() {
                                                 <td className="px-2 py-1.5 text-right font-mono text-green-700 border-r border-gray-100">{fmt(f.ganancia)}</td>
                                                 <td className="px-2 py-1.5 text-right font-mono text-blue-700 bg-slate-50/60">{fmt(f.activo)}</td>
                                                 <td className="px-2 py-1.5 text-right font-mono text-blue-900 bg-slate-50/60 border-r border-gray-100">{fmt(f.pasPat)}</td>
-                                                <td className="px-2 py-1.5 text-center whitespace-nowrap no-print">
-                                                    <button onClick={() => handleAbrirEditar(s)} className="bg-[#2E75B6] hover:bg-[#1E3A5F] text-white px-2 py-0.5 rounded text-[10px] font-medium mr-1 transition-all">Ajustar</button>
-                                                    <button onClick={() => confirmarEliminar(s.ANIO, s.MES, s.CUENTA_ID)} className="bg-red-500 hover:bg-red-600 text-white px-2 py-0.5 rounded text-[10px] font-medium transition-all">✕</button>
-                                                </td>
                                             </tr>
                                         );
                                     })}
