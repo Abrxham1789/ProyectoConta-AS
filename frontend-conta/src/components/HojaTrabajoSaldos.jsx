@@ -28,7 +28,6 @@ function calcularFila(s) {
     const neto = (d - a) + (ad - ah);
     const sajD = neto > 0 ? neto : 0;
     const sajA = neto < 0 ? Math.abs(neto) : 0;
-
     const id = String(s.CUENTA_ID || '').trim();
     const esResultados = ['4','5','6'].some(p => id.startsWith(p));
     const esBalance    = ['1','2','3'].some(p => id.startsWith(p));
@@ -47,7 +46,7 @@ function HojaTrabajoSaldos() {
     const navigate  = useNavigate();
     const { usuario } = useAuth();
     const tablaRef  = useRef(null);
-
+    
     /* Estado principal */
     const [saldos,    setSaldos]    = useState([]);
     const [mensaje,   setMensaje]   = useState({ texto: '', tipo: '' });
@@ -57,7 +56,7 @@ function HojaTrabajoSaldos() {
     const [filtro,    setFiltro]    = useState({ ANIO: '', MES: '' });
     const [periodoLabel, setPeriodoLabel] = useState('');
 
-    /* Estado modal edición manual (ajuste contable de emergencia) */
+    /* Estado modal edición manual */
     const [modalEditar,   setModalEditar]   = useState(false);
     const [modalEliminar, setModalEliminar] = useState({ visible: false, anio: null, mes: null, cuentaId: null });
     const [formEditar,    setFormEditar]    = useState({
@@ -70,7 +69,7 @@ function HojaTrabajoSaldos() {
         setTimeout(() => setMensaje({ texto: '', tipo: '' }), 4000);
     };
 
-    /* ── Generar hoja por período (flujo principal) ───────────────────── */
+    /* ── Generar hoja por período ────────────────────────────────────── */
     const handleGenerarHoja = async () => {
         if (!filtro.ANIO || !filtro.MES) {
             mostrarMensaje('⚠️ Seleccione un Año y un Mes para consolidar el reporte.', 'advertencia');
@@ -87,10 +86,10 @@ function HojaTrabajoSaldos() {
             setSaldos(datos);
             setGenerado(true);
             setSinDatos(datos.length === 0);
-
+            
             const mesLabel = MESES.find(m => m.value === Number(filtro.MES))?.label ?? filtro.MES;
             setPeriodoLabel(`${mesLabel} ${filtro.ANIO}`);
-
+            
             if (datos.length > 0) {
                 mostrarMensaje(`✅ Hoja consolidada: ${datos.length} cuenta(s) del período ${mesLabel} ${filtro.ANIO}.`, 'exito');
             }
@@ -116,7 +115,6 @@ function HojaTrabajoSaldos() {
         setFiltro(prev => ({ ...prev, [e.target.name]: val }));
     };
 
-    /* ── CRUD de ajuste manual (persiste en tabla caché + auditoría) ──── */
     const handleAbrirEditar = (s) => {
         setFormEditar({ ...s });
         setModalEditar(true);
@@ -130,9 +128,10 @@ function HojaTrabajoSaldos() {
             );
             setModalEditar(false);
             mostrarMensaje('Ajuste guardado y auditado correctamente.', 'exito');
-            /* Recarga el período actual para reflejar el cambio */
             handleGenerarHoja();
-        } catch (err) { mostrarMensaje('Error al guardar ajuste', 'error'); }
+        } catch (err) { 
+            mostrarMensaje('Error al guardar ajuste', 'error'); 
+        }
     };
 
     const confirmarEliminar = (anio, mes, cuentaId) =>
@@ -146,10 +145,11 @@ function HojaTrabajoSaldos() {
             setModalEliminar({ visible: false, anio: null, mes: null, cuentaId: null });
             mostrarMensaje('Registro eliminado de la caché.', 'exito');
             handleGenerarHoja();
-        } catch (err) { mostrarMensaje('Error al eliminar registro', 'error'); }
+        } catch (err) { 
+            mostrarMensaje('Error al eliminar registro', 'error'); 
+        }
     };
 
-    /* ── Exportar Excel ──────────────────────────────────────────────── */
     const exportarExcel = () => {
         if (!tablaRef.current) return;
         const html  = `<html><head><meta charset="UTF-8">
@@ -167,7 +167,6 @@ function HojaTrabajoSaldos() {
         URL.revokeObjectURL(url);
     };
 
-    /* ── Exportar PDF ────────────────────────────────────────────────── */
     const exportarPDF = () => {
         const prev = document.getElementById('_ht_print_styles');
         if (prev) prev.remove();
@@ -181,8 +180,7 @@ function HojaTrabajoSaldos() {
                 .seccion-reporte { position: absolute; inset: 0; font-size: 8px; font-family: Arial, sans-serif; }
                 .seccion-reporte table { border-collapse: collapse; width: 100%; }
                 .seccion-reporte th, .seccion-reporte td { border: 1px solid #999; padding: 2px 4px; }
-                .seccion-reporte th { background: #1E3A5F !important; color: white !important;
-                    -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                .seccion-reporte th { background: #1E3A5F !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                 .no-print { display: none !important; }
             }`;
         document.head.appendChild(style);
@@ -206,12 +204,10 @@ function HojaTrabajoSaldos() {
         };
     }, { d:0, a:0, ad:0, ah:0, s5:0, s6:0, s7:0, s8:0, s9:0, s10:0 });
 
-    const utilResultados = totales.s8 - totales.s7;  // + = Utilidad, - = Pérdida
-    const utilBalance    = totales.s9 - totales.s10;  // + = Activos > Pas+Pat → descuadre → se carga a Pas+Pat
-
+    const utilResultados = totales.s8 - totales.s7;
+    const utilBalance    = totales.s9 - totales.s10;
     const balanzaDescuadrada = Math.abs(totales.d - totales.a) > 0.01;
 
-    /* ── RENDER ──────────────────────────────────────────────────────── */
     return (
         <div className="min-h-screen bg-gray-50">
             <Toast mensaje={mensaje} />
@@ -231,7 +227,7 @@ function HojaTrabajoSaldos() {
                     <button
                         onClick={() => navigate('/')}
                         className="flex items-center gap-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm font-medium transition-all">
-                        ← Regresar
+                        <span>← Regresar</span>
                     </button>
                 </div>
             </header>
@@ -245,8 +241,7 @@ function HojaTrabajoSaldos() {
                         <div>
                             <h2 className="text-[#1E3A5F] font-bold text-base">Generar Hoja de Trabajo</h2>
                             <p className="text-gray-400 text-xs">
-                                Seleccione el período contable. El sistema consolidará automáticamente
-                                todas las pólizas autorizadas desde Oracle.
+                                Seleccione el período contable. El sistema consolidará automáticamente todas las pólizas autorizadas desde Oracle.
                             </p>
                         </div>
                     </div>
@@ -265,19 +260,27 @@ function HojaTrabajoSaldos() {
                                 {MESES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                             </select>
                         </div>
+                        
+                        {/* Corrección en el render condicional interno del string */}
                         <button
                             onClick={handleGenerarHoja}
                             disabled={cargando}
                             className="flex items-center gap-2 bg-[#1E3A5F] hover:bg-[#2a4f7c] disabled:opacity-60 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg text-sm font-semibold transition-all shadow-sm">
-                            {cargando
-                                ? <><span className="animate-spin">⏳</span> Consolidando...</>
-                                : '🔍 Generar Hoja de Trabajo'}
+                            {cargando ? (
+                                <>
+                                    <span className="animate-spin">⏳</span>
+                                    <span>Consolidando...</span>
+                                </>
+                            ) : (
+                                <span>🔍 Generar Hoja de Trabajo</span>
+                            )}
                         </button>
+                        
                         {generado && (
                             <button
                                 onClick={handleRestablecer}
                                 className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-5 py-2 rounded-lg text-sm font-semibold transition-all border border-gray-300">
-                                🔄 Nuevo período
+                                <span>🔄 Nuevo período</span>
                             </button>
                         )}
                         {generado && periodoLabel && (
@@ -288,44 +291,36 @@ function HojaTrabajoSaldos() {
                     </div>
                 </div>
 
-                {/* ── AVISO SIN DATOS ──────────────────────────────────── */}
+                {/* ── AVISOS DE CONTROL ────────────────────────────────── */}
                 {sinDatos && !cargando && (
                     <div className="bg-amber-50 border border-amber-300 text-amber-800 rounded-xl px-5 py-4 mb-5 text-sm font-medium no-print">
-                        💡 No se encontraron movimientos contables autorizados en Oracle para el período seleccionado.
-                        Verifique que existan pólizas con estado <strong>AUTORIZADA</strong> en ese mes y año.
+                        <span>💡 No se encontraron movimientos contables autorizados en Oracle para el período seleccionado. Verifique que existan pólizas con estado <strong>AUTORIZADA</strong> en ese mes y año.</span>
                     </div>
                 )}
 
-                {/* ── AVISO DESCUADRE ───────────────────────────────────── */}
                 {generado && !sinDatos && balanzaDescuadrada && (
                     <div className="bg-red-50 border border-red-400 text-red-700 rounded-xl px-5 py-4 mb-5 text-sm font-semibold no-print">
-                        🚨 Error de Integridad: La Balanza de Comprobación inicial se encuentra descuadrada.
-                        El total Deudor ({fmtSum(totales.d)}) no coincide con el total Acreedor ({fmtSum(totales.a)}).
-                        Revise las pólizas capturadas en Oracle.
+                        <span>🚨 Error de Integridad: La Balanza de Comprobación inicial se encuentra descuadrada. El total Deudor ({fmtSum(totales.d)}) no coincide con el total Acreedor ({fmtSum(totales.a)}). Revise las pólizas capturadas en Oracle.</span>
                     </div>
                 )}
 
                 {/* ── TABLA PRINCIPAL ──────────────────────────────────── */}
                 {(generado || saldos.length > 0) && (
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden seccion-reporte">
-
-                        {/* Toolbar */}
                         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3 no-print">
                             <div>
                                 <h2 className="text-[#1E3A5F] font-bold text-base">
-                                    Hoja de Trabajo Analítica
+                                    <span>Hoja de Trabajo Analítica</span>
                                     {periodoLabel && <span className="ml-2 text-sm font-normal text-gray-400">— {periodoLabel}</span>}
                                 </h2>
                                 <p className="text-gray-400 text-xs mt-0.5">{saldos.length} cuenta(s) · Columnas 1–10 calculadas automáticamente</p>
                             </div>
                             <div className="flex gap-2">
-                                <button onClick={exportarExcel}
-                                    className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-xs font-semibold transition-all shadow-sm">
-                                    🟢 Exportar Excel
+                                <button onClick={exportarExcel} className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-xs font-semibold transition-all shadow-sm">
+                                    <span>🟢 Exportar Excel</span>
                                 </button>
-                                <button onClick={exportarPDF}
-                                    className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-xs font-semibold transition-all shadow-sm">
-                                    🔴 Exportar PDF
+                                <button onClick={exportarPDF} className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-xs font-semibold transition-all shadow-sm">
+                                    <span>🔴 Exportar PDF</span>
                                 </button>
                             </div>
                         </div>
@@ -333,7 +328,6 @@ function HojaTrabajoSaldos() {
                         <div className="overflow-x-auto">
                             <table ref={tablaRef} className="w-full text-[11px] border-collapse">
                                 <thead>
-                                    {/* Fila 1: agrupadores */}
                                     <tr className="bg-[#1E3A5F] text-white">
                                         <th colSpan={4} className="px-3 py-2 text-left border-r border-blue-800 uppercase tracking-wider font-bold text-[10px]">Datos de la Cuenta</th>
                                         <th colSpan={2} className="px-3 py-2 text-center border-r border-blue-800 uppercase tracking-wider font-bold text-[10px] bg-[#163059]">1–2: Balanza Saldos</th>
@@ -343,86 +337,63 @@ function HojaTrabajoSaldos() {
                                         <th colSpan={2} className="px-3 py-2 text-center border-r border-blue-800 uppercase tracking-wider font-bold text-[10px] bg-[#163059]">9–10: Balance General</th>
                                         <th rowSpan={2} className="px-3 py-2 text-center font-bold uppercase text-[10px] tracking-wider no-print">Acciones</th>
                                     </tr>
-                                    {/* Fila 2: columnas individuales */}
                                     <tr className="bg-[#2a4f7c] text-white text-[10px]">
                                         <th className="px-2 py-1.5 text-center font-semibold border-r border-blue-700 w-10">Año</th>
                                         <th className="px-2 py-1.5 text-center font-semibold border-r border-blue-700 w-8">Mes</th>
-                                        <th className="px-2 py-1.5 text-left  font-semibold border-r border-blue-700 w-16">Código</th>
-                                        <th className="px-2 py-1.5 text-left  font-semibold border-r border-blue-700 min-w-[120px]">Nombre Cuenta</th>
-                                        {/* 1-2 */}
+                                        <th className="px-2 py-1.5 text-left font-semibold border-r border-blue-700 w-16">Código</th>
+                                        <th className="px-2 py-1.5 text-left font-semibold border-r border-blue-700 min-w-[120px]">Nombre Cuenta</th>
                                         <th className="px-2 py-1.5 text-right font-semibold border-r border-blue-700 bg-[#163059]/60 w-20">Deudor</th>
                                         <th className="px-2 py-1.5 text-right font-semibold border-r border-blue-700 bg-[#163059]/60 w-20">Acreedor</th>
-                                        {/* 3-4 */}
                                         <th className="px-2 py-1.5 text-right font-semibold border-r border-blue-700 w-20">Debe</th>
                                         <th className="px-2 py-1.5 text-right font-semibold border-r border-blue-700 w-20">Haber</th>
-                                        {/* 5-6 */}
                                         <th className="px-2 py-1.5 text-right font-semibold border-r border-blue-700 bg-[#163059]/60 w-20">Deudor</th>
                                         <th className="px-2 py-1.5 text-right font-semibold border-r border-blue-700 bg-[#163059]/60 w-20">Acreedor</th>
-                                        {/* 7-8 */}
                                         <th className="px-2 py-1.5 text-right font-semibold border-r border-blue-700 w-20">Pérdida</th>
                                         <th className="px-2 py-1.5 text-right font-semibold border-r border-blue-700 w-20">Ganancia</th>
-                                        {/* 9-10 */}
                                         <th className="px-2 py-1.5 text-right font-semibold border-r border-blue-700 bg-[#163059]/60 w-20">Activo</th>
                                         <th className="px-2 py-1.5 text-right font-semibold border-r border-blue-700 bg-[#163059]/60 w-20">Pas+Pat</th>
                                     </tr>
                                 </thead>
-
                                 <tbody>
-                                    {/* Filas de datos */}
                                     {saldos.map((s, i) => {
                                         const f = calcularFila(s);
+                                        const llaveFila = `fila-dinamica-${s.ANIO}-${s.MES}-${s.CUENTA_ID}-${i}`;
                                         return (
-                                            <tr key={`${s.ANIO}-${s.MES}-${s.CUENTA_ID}`}
-                                                className={`border-b border-gray-200 hover:bg-blue-50/30 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}`}>
+                                            <tr key={llaveFila} className={`border-b border-gray-200 hover:bg-blue-50/30 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}`}>
                                                 <td className="px-2 py-1.5 text-center font-mono text-gray-500">{s.ANIO}</td>
                                                 <td className="px-2 py-1.5 text-center text-gray-600">{s.MES}</td>
-                                                <td className="px-2 py-1.5 text-left  font-mono font-semibold text-gray-600 border-r border-gray-100">{s.CUENTA_ID}</td>
-                                                <td className="px-2 py-1.5 text-left  font-medium text-gray-800 border-r border-gray-100 max-w-[160px] truncate" title={s.NOMBRE_CUENTA}>{s.NOMBRE_CUENTA}</td>
-                                                {/* 1-2 */}
+                                                <td className="px-2 py-1.5 text-left font-mono font-semibold text-gray-600 border-r border-gray-100">{s.CUENTA_ID}</td>
+                                                <td className="px-2 py-1.5 text-left font-medium text-gray-800 border-r border-gray-100 max-w-[160px] truncate" title={s.NOMBRE_CUENTA}>{s.NOMBRE_CUENTA}</td>
                                                 <td className="px-2 py-1.5 text-right font-mono text-gray-700 bg-slate-50/60">{fmt(f.d)}</td>
                                                 <td className="px-2 py-1.5 text-right font-mono text-gray-700 bg-slate-50/60 border-r border-gray-100">{fmt(f.a)}</td>
-                                                {/* 3-4 */}
                                                 <td className="px-2 py-1.5 text-right font-mono text-gray-700">{fmt(f.ad)}</td>
                                                 <td className="px-2 py-1.5 text-right font-mono text-gray-700 border-r border-gray-100">{fmt(f.ah)}</td>
-                                                {/* 5-6 */}
                                                 <td className="px-2 py-1.5 text-right font-mono font-medium text-gray-900 bg-slate-50/60">{fmt(f.sajD)}</td>
                                                 <td className="px-2 py-1.5 text-right font-mono font-medium text-gray-900 bg-slate-50/60 border-r border-gray-100">{fmt(f.sajA)}</td>
-                                                {/* 7-8 */}
                                                 <td className="px-2 py-1.5 text-right font-mono text-red-600">{fmt(f.perdida)}</td>
                                                 <td className="px-2 py-1.5 text-right font-mono text-green-700 border-r border-gray-100">{fmt(f.ganancia)}</td>
-                                                {/* 9-10 */}
                                                 <td className="px-2 py-1.5 text-right font-mono text-blue-700 bg-slate-50/60">{fmt(f.activo)}</td>
                                                 <td className="px-2 py-1.5 text-right font-mono text-blue-900 bg-slate-50/60 border-r border-gray-100">{fmt(f.pasPat)}</td>
-                                                {/* Acciones */}
                                                 <td className="px-2 py-1.5 text-center whitespace-nowrap no-print">
-                                                    <button onClick={() => handleAbrirEditar(s)}
-                                                        className="bg-[#2E75B6] hover:bg-[#1E3A5F] text-white px-2 py-0.5 rounded text-[10px] font-medium mr-1 transition-all">
-                                                        Ajustar
-                                                    </button>
-                                                    <button onClick={() => confirmarEliminar(s.ANIO, s.MES, s.CUENTA_ID)}
-                                                        className="bg-red-500 hover:bg-red-600 text-white px-2 py-0.5 rounded text-[10px] font-medium transition-all">
-                                                        ✕
-                                                    </button>
+                                                    <button onClick={() => handleAbrirEditar(s)} className="bg-[#2E75B6] hover:bg-[#1E3A5F] text-white px-2 py-0.5 rounded text-[10px] font-medium mr-1 transition-all">Ajustar</button>
+                                                    <button onClick={() => confirmarEliminar(s.ANIO, s.MES, s.CUENTA_ID)} className="bg-red-500 hover:bg-red-600 text-white px-2 py-0.5 rounded text-[10px] font-medium transition-all">✕</button>
                                                 </td>
                                             </tr>
                                         );
                                     })}
-
-                                    {/* Fila vacía si sin datos pero ya se intentó generar */}
+                                    {/* Cambiado a renderizado condicional válido dentro de tbody para evitar caídas */}
                                     {sinDatos && (
-                                        <tr>
+                                        <tr key="fila-bloque-sin-datos-warning">
                                             <td colSpan={15} className="px-4 py-8 text-center text-gray-400 text-xs italic">
-                                                Sin registros para este período.
+                                                <span>Sin registros para este período.</span>
                                             </td>
                                         </tr>
                                     )}
-
-                                    {/* ── PIE DE PÁGINA: 3 filas de cierre contable ──────── */}
-
-                                    {/* FILA 1: SUBTOTALES */}
+                                </tbody>
+                                <tfoot>
                                     <tr className={`font-bold border-t-2 border-gray-400 text-[10px] ${balanzaDescuadrada ? 'bg-red-100' : 'bg-gray-100'}`}>
                                         <td colSpan={4} className="px-3 py-2 text-center text-gray-700 uppercase tracking-widest font-bold">
-                                            Subtotales
+                                            <span>Subtotales </span>
                                             {balanzaDescuadrada && <span className="ml-2 text-red-600 text-[9px] not-italic">⚠ Descuadre</span>}
                                         </td>
                                         <td className="px-2 py-2 text-right font-mono">{fmtSum(totales.d)}</td>
@@ -437,161 +408,28 @@ function HojaTrabajoSaldos() {
                                         <td className="px-2 py-2 text-right font-mono text-blue-900 border-r border-gray-300">{fmtSum(totales.s10)}</td>
                                         <td className="bg-white no-print"></td>
                                     </tr>
-
-                                    {/* FILA 2: RESULTADO DEL EJERCICIO */}
                                     <tr className="bg-amber-50 text-[10px] font-semibold italic border-b border-gray-300">
                                         <td colSpan={4} className="px-3 py-1.5 text-center uppercase tracking-widest text-amber-800 font-bold not-italic">
-                                            {utilResultados >= 0
-                                                ? '✦ Utilidad del Ejercicio'
-                                                : '✦ Pérdida del Ejercicio'}
+                                            <span>{utilResultados >= 0 ? '✦ Utilidad del Ejercicio' : '✦ Pérdida del Ejercicio'}</span>
                                         </td>
-                                        {/* Columnas 1-2: vacías */}
                                         <td className="border-r border-gray-200 bg-gray-50"></td>
                                         <td className="border-r border-gray-200 bg-gray-50"></td>
-                                        {/* Columnas 3-4: vacías */}
                                         <td className="border-r border-gray-200"></td>
                                         <td className="border-r border-gray-200"></td>
-                                        {/* Columnas 5-6: vacías */}
                                         <td className="border-r border-gray-200 bg-gray-50"></td>
                                         <td className="border-r border-gray-200 bg-gray-50"></td>
-                                        {/* Columnas 7-8: cuadre de resultados */}
-                                        <td className="px-2 py-1.5 text-right font-mono text-red-700 not-italic">
-                                            {/* Si hay utilidad → la pérdida necesita aumentar para igualar */}
-                                            {utilResultados > 0 ? fmtSum(utilResultados) : '—'}
-                                        </td>
-                                        <td className="px-2 py-1.5 text-right font-mono text-green-700 border-r border-gray-300 not-italic">
-                                            {utilResultados < 0 ? fmtSum(Math.abs(utilResultados)) : '—'}
-                                        </td>
-                                        {/* Columnas 9-10: cuadre de balance */}
-                                        <td className="px-2 py-1.5 text-right font-mono text-blue-700 not-italic">
-                                            {utilBalance < 0 ? fmtSum(Math.abs(utilBalance)) : '—'}
-                                        </td>
-                                        <td className="px-2 py-1.5 text-right font-mono text-blue-900 border-r border-gray-300 not-italic">
-                                            {utilBalance > 0 ? fmtSum(utilBalance) : '—'}
-                                        </td>
+                                        <td className="px-2 py-1.5 text-right font-mono text-red-700">{utilResultados < 0 ? fmtSum(Math.abs(utilResultados)) : '—'}</td>
+                                        <td className="px-2 py-1.5 text-right font-mono text-green-700 border-r border-gray-300">{utilResultados >= 0 ? fmtSum(utilResultados) : '—'}</td>
+                                        <td className="px-2 py-1.5 text-right font-mono text-blue-700">{utilBalance < 0 ? fmtSum(Math.abs(utilBalance)) : '—'}</td>
+                                        <td className="px-2 py-1.5 text-right font-mono text-blue-900 border-r border-gray-300">{utilBalance >= 0 ? fmtSum(utilBalance) : '—'}</td>
                                         <td className="bg-white no-print"></td>
                                     </tr>
-
-                                    {/* FILA 3: SUMAS IGUALES (totales cuadrados) */}
-                                    <tr className="bg-[#1E3A5F] text-white font-bold text-[10px]">
-                                        <td colSpan={4} className="px-3 py-2.5 text-center uppercase tracking-[0.15em]">Sumas Iguales</td>
-                                        <td className="px-2 py-2.5 text-right font-mono">{fmtSum(totales.d)}</td>
-                                        <td className="px-2 py-2.5 text-right font-mono border-r border-blue-700">{fmtSum(totales.a)}</td>
-                                        <td className="px-2 py-2.5 text-right font-mono">{fmtSum(totales.ad)}</td>
-                                        <td className="px-2 py-2.5 text-right font-mono border-r border-blue-700">{fmtSum(totales.ah)}</td>
-                                        <td className="px-2 py-2.5 text-right font-mono">{fmtSum(totales.s5)}</td>
-                                        <td className="px-2 py-2.5 text-right font-mono border-r border-blue-700">{fmtSum(totales.s6)}</td>
-                                        {/* Resultados cuadrados: subtotal + resultado del ejercicio */}
-                                        <td className="px-2 py-2.5 text-right font-mono bg-[#163059]">
-                                            {fmtSum(utilResultados > 0 ? totales.s7 + utilResultados : totales.s7)}
-                                        </td>
-                                        <td className="px-2 py-2.5 text-right font-mono border-r border-blue-700 bg-[#163059]">
-                                            {fmtSum(utilResultados < 0 ? totales.s8 + Math.abs(utilResultados) : totales.s8)}
-                                        </td>
-                                        {/* Balance cuadrado */}
-                                        <td className="px-2 py-2.5 text-right font-mono bg-[#122947]">
-                                            {fmtSum(utilBalance < 0 ? totales.s9 + Math.abs(utilBalance) : totales.s9)}
-                                        </td>
-                                        <td className="px-2 py-2.5 text-right font-mono border-r border-blue-700 bg-[#122947]">
-                                            {fmtSum(utilBalance > 0 ? totales.s10 + utilBalance : totales.s10)}
-                                        </td>
-                                        <td className="bg-[#1E3A5F] no-print"></td>
-                                    </tr>
-                                </tbody>
+                                </tfoot>
                             </table>
                         </div>
                     </div>
                 )}
-
-                {/* Estado inicial (antes de generar) */}
-                {!generado && !cargando && (
-                    <div className="bg-white rounded-xl border border-dashed border-gray-300 py-16 text-center text-gray-400">
-                        <div className="text-5xl mb-3">📋</div>
-                        <p className="text-sm font-medium">Seleccione un período y presione <strong>Generar Hoja de Trabajo</strong></p>
-                        <p className="text-xs mt-1">El sistema consolidará automáticamente las pólizas autorizadas desde Oracle.</p>
-                    </div>
-                )}
-
             </main>
-
-            {/* ── MODAL: AJUSTE MANUAL ─────────────────────────────────── */}
-            {modalEditar && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 no-print">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
-                        <div className="bg-[#1E3A5F] text-white px-6 py-4 rounded-t-xl flex items-center justify-between">
-                            <div>
-                                <h3 className="font-bold text-base">Ajuste Manual de Saldo</h3>
-                                <p className="text-blue-200 text-xs">Los cambios se auditarán en Oracle automáticamente.</p>
-                            </div>
-                            <button onClick={() => setModalEditar(false)} className="text-white/70 hover:text-white text-xl">✕</button>
-                        </div>
-                        <div className="p-6">
-                            {/* Info de la cuenta (solo lectura) */}
-                            <div className="bg-gray-50 rounded-lg p-3 mb-4 text-xs text-gray-600 grid grid-cols-3 gap-2">
-                                <div><span className="font-semibold block uppercase tracking-wide text-gray-400">Año</span>{formEditar.ANIO}</div>
-                                <div><span className="font-semibold block uppercase tracking-wide text-gray-400">Mes</span>{formEditar.MES}</div>
-                                <div><span className="font-semibold block uppercase tracking-wide text-gray-400">Código</span>{formEditar.CUENTA_ID}</div>
-                                <div className="col-span-3"><span className="font-semibold block uppercase tracking-wide text-gray-400">Cuenta</span>{formEditar.NOMBRE_CUENTA}</div>
-                            </div>
-                            {/* Campos editables */}
-                            <div className="grid grid-cols-2 gap-3">
-                                {[
-                                    ['SALDO_DEUDOR', 'Saldo Deudor'],
-                                    ['SALDO_ACREEDOR', 'Saldo Acreedor'],
-                                    ['AJUSTE_DEBE', 'Ajuste Debe'],
-                                    ['AJUSTE_HABER', 'Ajuste Haber'],
-                                ].map(([name, label]) => (
-                                    <div key={name}>
-                                        <label className={labelClass}>{label}</label>
-                                        <input
-                                            name={name}
-                                            type="number"
-                                            step="0.01"
-                                            value={formEditar[name]}
-                                            onChange={e => setFormEditar(prev => ({ ...prev, [name]: e.target.value }))}
-                                            className={inputClass}
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="px-6 pb-6 flex gap-3 justify-end">
-                            <button onClick={() => setModalEditar(false)}
-                                className="px-5 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-all">
-                                Cancelar
-                            </button>
-                            <button onClick={handleGuardarAjuste}
-                                className="px-5 py-2 rounded-lg bg-[#1E3A5F] hover:bg-[#2a4f7c] text-white text-sm font-semibold transition-all">
-                                Guardar Ajuste
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ── MODAL: CONFIRMAR ELIMINAR ────────────────────────────── */}
-            {modalEliminar.visible && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 no-print">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6 text-center">
-                        <span className="text-5xl mb-4 block">⚠️</span>
-                        <h3 className="text-gray-800 font-bold text-lg mb-2">¿Eliminar registro de caché?</h3>
-                        <p className="text-gray-500 text-sm mb-6">
-                            Solo se elimina el ajuste manual almacenado. Las pólizas originales en Oracle no se modifican.
-                        </p>
-                        <div className="flex gap-3 justify-center">
-                            <button
-                                onClick={() => setModalEliminar({ visible: false, anio: null, mes: null, cuentaId: null })}
-                                className="px-5 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-all">
-                                Cancelar
-                            </button>
-                            <button onClick={handleEliminar}
-                                className="px-5 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-all">
-                                Sí, eliminar
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

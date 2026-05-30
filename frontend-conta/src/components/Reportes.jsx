@@ -50,17 +50,23 @@ const MESES = [
 // SUB-COMPONENTES REUTILIZABLES
 // ─────────────────────────────────────────────
 
-const FilaCuenta = ({ cuenta, nombre, saldo, negativo = false }) => (
-    <div className="flex items-center justify-between py-1.5 pl-8 pr-2 hover:bg-slate-50 border-b border-dashed border-slate-100">
-        <div className="flex items-center gap-3">
-            <span className="text-xs font-mono text-slate-400 w-16 shrink-0">{cuenta}</span>
-            <span className="text-sm text-slate-700">{nombre}</span>
+const FilaCuenta = ({ cuenta, nombre, saldo, negativo = false }) => {
+    // Fabricamos un identificador para estabilizar el micro-DOM de React
+    const llaveInterna = `txt-cuenta-${cuenta}`;
+    return (
+        <div className="flex items-center justify-between py-1.5 pl-8 pr-2 hover:bg-slate-50 border-b border-dashed border-slate-100">
+            <div className="flex items-center gap-3">
+                <span className="text-xs font-mono text-slate-400 w-16 shrink-0">{cuenta}</span>
+                <span className="text-sm text-slate-700">{nombre}</span>
+            </div>
+            <span className={`text-sm font-mono tabular-nums ${negativo ? 'text-red-600' : 'text-slate-800'}`}>
+                <span key={llaveInterna}>
+                    {negativo ? `(${fmt(Math.abs(saldo))})` : fmt(Math.abs(saldo))}
+                </span>
+            </span>
         </div>
-        <span className={`text-sm font-mono tabular-nums ${negativo ? 'text-red-600' : 'text-slate-800'}`}>
-            {negativo ? `(${fmt(Math.abs(saldo))})` : fmt(Math.abs(saldo))}
-        </span>
-    </div>
-);
+    );
+};
 
 const FilaTotal = ({ label, valor, nivel = 1, negativo = false, doubleLine = false }) => {
     const estilos = {
@@ -690,29 +696,33 @@ function Reportes() {
 
     // ── Renderizador de filas BS por bloque ────
     const renderFilasBS = (cuentas = []) => {
-        const { RUBROS_ACREEDORES = [] } = calcBS;
-        return cuentas.map((c, index) => {
-            const esAcreedor = RUBROS_ACREEDORES.includes(c.RUBRO);
-            const saldoAbs   = Math.abs(parseFloat(c.SALDO_FINAL) || 0);
-            return (
-                <tr key={c.CUENTA_ID} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="px-4 py-2.5 font-mono text-gray-500 text-xs">{c.CUENTA_ID}</td>
-                    <td className="px-4 py-2.5 text-gray-800 font-medium">{c.NOMBRE}</td>
-                    <td className="px-4 py-2.5">
-                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">{c.RUBRO}</span>
-                    </td>
-                    <td className="px-4 py-2.5 text-right font-mono text-gray-700">{fmt(c.SUMA_DEBE)}</td>
-                    <td className="px-4 py-2.5 text-right font-mono text-gray-700">{fmt(c.SUMA_HABER)}</td>
-                    <td className="px-4 py-2.5 text-right font-mono font-semibold text-gray-800">
-                        {!esAcreedor ? fmt(saldoAbs) : <span className="text-gray-200">—</span>}
-                    </td>
-                    <td className="px-4 py-2.5 text-right font-mono font-semibold text-gray-800">
-                        {esAcreedor ? fmt(saldoAbs) : <span className="text-gray-200">—</span>}
-                    </td>
-                </tr>
-            );
-        });
-    };
+    const { RUBROS_ACREEDORES = [] } = calcBS;
+    return cuentas.map((c, index) => {
+        const esAcreedor = RUBROS_ACREEDORES.includes(c.RUBRO);
+        const saldoAbs = Math.abs(parseFloat(c.SALDO_FINAL) || 0);
+        
+        //identificador verdaderamente único para React
+        const llaveUnica = `${c.CUENTA_ID}-${c.RUBRO || 'sin-rubro'}-${index}`;
+        
+        return (
+            <tr key={llaveUnica} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                <td className="px-4 py-2.5 font-mono text-gray-500 text-xs">{c.CUENTA_ID}</td>
+                <td className="px-4 py-2.5 text-gray-800 font-medium">{c.NOMBRE}</td>
+                <td className="px-4 py-2.5">
+                    <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">{c.RUBRO}</span>
+                </td>
+                <td className="px-4 py-2.5 text-right font-mono text-gray-700">{fmt(c.SUMA_DEBE)}</td>
+                <td className="px-4 py-2.5 text-right font-mono text-gray-700">{fmt(c.SUMA_HABER)}</td>
+                <td className="px-4 py-2.5 text-right font-mono font-semibold text-gray-800">
+                    {!esAcreedor ? fmt(saldoAbs) : <span className="text-gray-200">—</span>}
+                </td>
+                <td className="px-4 py-2.5 text-right font-mono font-semibold text-gray-800">
+                    {esAcreedor ? fmt(saldoAbs) : <span className="text-gray-200">—</span>}
+                </td>
+            </tr>
+        );
+    });
+};
 
     // ────────────────────────────────────────────────────────────
     // RENDER
@@ -980,16 +990,27 @@ function Reportes() {
 
                         <div className="py-2">
                             <TituloSeccion color="text-green-700">Ingresos</TituloSeccion>
-                            {(calcER.ingresos || []).map(d => (
-                                <FilaCuenta key={d.CUENTA_ID} cuenta={d.CUENTA_ID} nombre={d.NOMBRE} saldo={d.SALDO} />
+                            {(calcER.ingresos || []).map((d, idx) => (
+                                <FilaCuenta 
+                                    key={`er-ingreso-${d.CUENTA_ID || 'sinid'}-${idx}`} 
+                                    cuenta={d.CUENTA_ID} 
+                                    nombre={d.NOMBRE} 
+                                    saldo={d.SALDO} 
+                                />
                             ))}
                             <FilaTotal label="Total Ingresos" valor={calcER.totalIngresos ?? 0} nivel={1} />
 
                             {(calcER.costos || []).length > 0 && (
                                 <>
                                     <TituloSeccion color="text-orange-700">Costo de Ventas</TituloSeccion>
-                                    {calcER.costos.map(d => (
-                                        <FilaCuenta key={d.CUENTA_ID} cuenta={d.CUENTA_ID} nombre={d.NOMBRE} saldo={d.SALDO} negativo />
+                                    {(calcER.costos || []).map((d, idx) => (
+                                        <FilaCuenta 
+                                            key={`er-costo-${d.CUENTA_ID || 'sinid'}-${idx}`} 
+                                            cuenta={d.CUENTA_ID} 
+                                            nombre={d.NOMBRE} 
+                                            saldo={d.SALDO} 
+                                            negativo 
+                                        />
                                     ))}
                                     <FilaTotal label="Total Costos" valor={calcER.totalCostos ?? 0} nivel={1} negativo />
                                 </>
@@ -998,8 +1019,14 @@ function Reportes() {
                             <FilaTotal label="UTILIDAD BRUTA" valor={calcER.utilidadBruta ?? 0} nivel={2} negativo={(calcER.utilidadBruta ?? 0) < 0} />
 
                             <TituloSeccion color="text-red-700">Gastos Operativos</TituloSeccion>
-                            {(calcER.gastos || []).map(d => (
-                                <FilaCuenta key={d.CUENTA_ID} cuenta={d.CUENTA_ID} nombre={d.NOMBRE} saldo={d.SALDO} negativo />
+                            {(calcER.gastos || []).map((d, idx) => (
+                                <FilaCuenta 
+                                    key={`er-gasto-${d.CUENTA_ID || 'sinid'}-${idx}`} 
+                                    cuenta={d.CUENTA_ID} 
+                                    nombre={d.NOMBRE} 
+                                    saldo={d.SALDO} 
+                                    negativo 
+                                />
                             ))}
                             <FilaTotal label="Total Gastos" valor={calcER.totalGastos ?? 0} nivel={1} negativo />
 
@@ -1012,7 +1039,7 @@ function Reportes() {
                                     doubleLine
                                 />
                             </div>
-                        </div>
+                        </div>  
                     </div>
                 )}
 
@@ -1056,14 +1083,14 @@ function Reportes() {
                                     <h3 className="font-extrabold text-[#1E3A5F] text-sm uppercase tracking-widest">ACTIVOS</h3>
                                 </div>
                                 <TituloSeccion color="text-blue-600">Activo Corriente</TituloSeccion>
-                                {(calcBG.activoCorriente || []).map(d => (
-                                    <FilaCuenta key={d.CUENTA_ID} cuenta={d.CUENTA_ID} nombre={d.NOMBRE} saldo={d.SALDO} />
+                                {(calcBG.activoCorriente || []).map((d, idx) => (
+                                    <FilaCuenta key={`bg-act-corr-${d.CUENTA_ID}-${idx}`} cuenta={d.CUENTA_ID} nombre={d.NOMBRE} saldo={d.SALDO} />
                                 ))}
                                 <FilaTotal label="Total Activo Corriente" valor={(calcBG.activoCorriente || []).reduce((s, d) => s + (parseFloat(d.SALDO) || 0), 0)} nivel={1} />
 
                                 <TituloSeccion color="text-blue-800">Activo No Corriente</TituloSeccion>
-                                {(calcBG.activoNoCorriente || []).map(d => (
-                                    <FilaCuenta key={d.CUENTA_ID} cuenta={d.CUENTA_ID} nombre={d.NOMBRE} saldo={d.SALDO} />
+                                {(calcBG.activoNoCorriente || []).map((d, idx) => (
+                                    <FilaCuenta key={`bg-act-nocorr-${d.CUENTA_ID}-${idx}`} cuenta={d.CUENTA_ID} nombre={d.NOMBRE} saldo={d.SALDO} />
                                 ))}
                                 <FilaTotal label="Total Activo No Corriente" valor={(calcBG.activoNoCorriente || []).reduce((s, d) => s + (parseFloat(d.SALDO) || 0), 0)} nivel={1} />
 
@@ -1078,21 +1105,21 @@ function Reportes() {
                                     <h3 className="font-extrabold text-red-800 text-sm uppercase tracking-widest">PASIVOS Y PATRIMONIO</h3>
                                 </div>
                                 <TituloSeccion color="text-red-600">Pasivo Corriente</TituloSeccion>
-                                {(calcBG.pasivoCorriente || []).map(d => (
-                                    <FilaCuenta key={d.CUENTA_ID} cuenta={d.CUENTA_ID} nombre={d.NOMBRE} saldo={Math.abs(d.SALDO)} />
+                                {(calcBG.pasivoCorriente || []).map((d, idx) => (
+                                    <FilaCuenta key={`bg-pas-corr-${d.CUENTA_ID}-${idx}`} cuenta={d.CUENTA_ID} nombre={d.NOMBRE} saldo={d.SALDO} />
                                 ))}
                                 <FilaTotal label="Total Pasivo Corriente" valor={(calcBG.pasivoCorriente || []).reduce((s, d) => s + Math.abs(parseFloat(d.SALDO) || 0), 0)} nivel={1} />
 
                                 <TituloSeccion color="text-red-800">Pasivo No Corriente</TituloSeccion>
-                                {(calcBG.pasivoNoCorriente || []).map(d => (
-                                    <FilaCuenta key={d.CUENTA_ID} cuenta={d.CUENTA_ID} nombre={d.NOMBRE} saldo={Math.abs(d.SALDO)} />
+                                {(calcBG.pasivoNoCorriente || []).map((d, idx) => (
+                                    <FilaCuenta key={`bg-pas-nocorr-${d.CUENTA_ID}-${idx}`} cuenta={d.CUENTA_ID} nombre={d.NOMBRE} saldo={d.SALDO} />
                                 ))}
                                 <FilaTotal label="Total Pasivo No Corriente" valor={(calcBG.pasivoNoCorriente || []).reduce((s, d) => s + Math.abs(parseFloat(d.SALDO) || 0), 0)} nivel={1} />
                                 <FilaTotal label="TOTAL PASIVOS" valor={calcBG.totalPasivo ?? 0} nivel={2} />
 
                                 <TituloSeccion color="text-emerald-700">Patrimonio</TituloSeccion>
-                                {(calcBG.patrimonio || []).map(d => (
-                                    <FilaCuenta key={d.CUENTA_ID} cuenta={d.CUENTA_ID} nombre={d.NOMBRE} saldo={Math.abs(d.SALDO)} />
+                                {(calcBG.patrimonio || []).map((d, idx) => (
+                                    <FilaCuenta key={`bg-patri-${d.CUENTA_ID}-${idx}`} cuenta={d.CUENTA_ID} nombre={d.NOMBRE} saldo={d.SALDO} />
                                 ))}
                                 <FilaTotal label="Total Patrimonio" valor={calcBG.totalPatrimonio ?? 0} nivel={1} />
 
